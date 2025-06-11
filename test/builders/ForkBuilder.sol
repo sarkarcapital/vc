@@ -8,13 +8,13 @@ import {DAOFactory} from "@aragon/osx/framework/dao/DAOFactory.sol";
 import {PluginRepoFactory} from "@aragon/osx/framework/plugin/repo/PluginRepoFactory.sol";
 import {PluginRepo} from "@aragon/osx/framework/plugin/repo/PluginRepo.sol";
 import {PluginSetupRef} from "@aragon/osx/framework/plugin/setup/PluginSetupProcessorHelpers.sol";
-import {MyUpgradeablePlugin} from "../../src/MyUpgradeablePlugin.sol";
-import {MyPluginSetup} from "../../src/setup/MyPluginSetup.sol";
+import {TokenVotingSetup} from "../../src/TokenVotingSetup.sol";
+import {TokenVoting} from "../../src/TokenVoting.sol";
 import {NON_EMPTY_BYTES} from "../constants.sol";
 
 contract ForkBuilder is ForkTestBase {
     address immutable DAO_BASE = address(new DAO());
-    address immutable UPGRADEABLE_PLUGIN_BASE = address(new MyUpgradeablePlugin());
+    address immutable UPGRADEABLE_PLUGIN_BASE = address(new TokenVoting());
 
     // Add your own parameters here
     address manager = bob;
@@ -34,11 +34,19 @@ contract ForkBuilder is ForkTestBase {
     /// @dev The setup is done on block/timestamp 0 and tests should be made on block/timestamp 1 or later.
     function build()
         public
-        returns (DAO dao, PluginRepo pluginRepo, MyPluginSetup pluginSetup, MyUpgradeablePlugin plugin)
+        returns (
+            DAO dao,
+            PluginRepo pluginRepo,
+            TokenVotingSetup pluginSetup,
+            TokenVoting plugin
+        )
     {
         // Prepare a plugin repo with an initial version and subdomain
-        string memory pluginRepoSubdomain = string.concat("my-upgradeable-plugin-", vm.toString(block.timestamp));
-        pluginSetup = new MyPluginSetup();
+        string memory pluginRepoSubdomain = string.concat(
+            "my-token-voting-plugin-",
+            vm.toString(block.timestamp)
+        );
+        pluginSetup = new TokenVotingSetup();
         pluginRepo = pluginRepoFactory.createPluginRepoWithFirstVersion({
             _subdomain: string(pluginRepoSubdomain),
             _pluginSetup: address(pluginSetup),
@@ -48,26 +56,40 @@ contract ForkBuilder is ForkTestBase {
         });
 
         // DAO settings
-        DAOFactory.DAOSettings memory daoSettings =
-            DAOFactory.DAOSettings({trustedForwarder: address(0), daoURI: "http://host/", subdomain: "", metadata: ""});
+        DAOFactory.DAOSettings memory daoSettings = DAOFactory.DAOSettings({
+            trustedForwarder: address(0),
+            daoURI: "http://host/",
+            subdomain: "",
+            metadata: ""
+        });
 
         // Define what plugin(s) to install and give the corresponding parameters
-        DAOFactory.PluginSettings[] memory installSettings = new DAOFactory.PluginSettings[](1);
+        DAOFactory.PluginSettings[]
+            memory installSettings = new DAOFactory.PluginSettings[](1);
 
-        bytes memory pluginInstallData = pluginSetup.encodeInstallationParams(manager, initialNumber);
+        bytes memory pluginInstallData = pluginSetup.encodeInstallationParams(
+            manager,
+            initialNumber
+        );
         installSettings[0] = DAOFactory.PluginSettings({
-            pluginSetupRef: PluginSetupRef({versionTag: getLatestTag(pluginRepo), pluginSetupRepo: pluginRepo}),
+            pluginSetupRef: PluginSetupRef({
+                versionTag: getLatestTag(pluginRepo),
+                pluginSetupRepo: pluginRepo
+            }),
             data: pluginInstallData
         });
 
         // Create DAO with the plugin
         DAOFactory.InstalledPlugin[] memory installedPlugins;
-        (dao, installedPlugins) = daoFactory.createDao(daoSettings, installSettings);
-        plugin = MyUpgradeablePlugin(installedPlugins[0].plugin);
+        (dao, installedPlugins) = daoFactory.createDao(
+            daoSettings,
+            installSettings
+        );
+        plugin = TokenVoting(installedPlugins[0].plugin);
 
         // Labels
         vm.label(address(dao), "DAO");
-        vm.label(address(plugin), "MyUpgradeablePlugin");
+        vm.label(address(plugin), "TokenVoting");
 
         // Moving forward to avoid collisions
         vm.roll(block.number + 1);

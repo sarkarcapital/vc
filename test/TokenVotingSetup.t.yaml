@@ -1,0 +1,56 @@
+TokenVotingSetup:
+  - when: Calling supportsInterface('0xffffffff')
+    then:
+      - it: does not support the empty interface
+  - when: Calling governanceERC20Base() and governanceWrappedERC20Base() after initialization
+    comment: This test is skipped if the network is ZkSync
+    then:
+      - it: stores the bases provided through the constructor
+  - given: The context is prepareInstallation
+    and:
+      - when: Calling prepareInstallation with data that is empty or not of minimum length
+        then:
+          - it: fails if data is empty, or not of minimum length
+      - when: Calling prepareInstallation if `MintSettings` arrays do not have the same length
+        then:
+          - it: fails if `MintSettings` arrays do not have the same length
+      - when: Calling prepareInstallation if passed token address is not a contract
+        then:
+          - it: fails if passed token address is not a contract
+      - when: Calling prepareInstallation if passed token address is not ERC20
+        then:
+          - it: fails if passed token address is not ERC20
+      - when: Calling prepareInstallation and an ERC20 token address is supplied
+        then:
+          - it: correctly returns plugin, helpers and permissions, when an ERC20 token address is supplied
+      - when: Calling prepareInstallation and an ERC20 token address is supplied
+        then:
+          - it: correctly sets up `GovernanceWrappedERC20` helper, when an ERC20 token address is supplied
+      - when: Calling prepareInstallation and a governance token address is supplied
+        then:
+          - it: correctly returns plugin, helpers and permissions, when a governance token address is supplied
+      - when: Calling prepareInstallation and a token address is not supplied
+        then:
+          - it: correctly returns plugin, helpers and permissions, when a token address is not supplied
+      - when: Calling prepareInstallation and a token address is not passed
+        then:
+          - it: correctly sets up the plugin and helpers, when a token address is not passed
+  - given: The context is prepareUpdate
+    and:
+      - when: Calling prepareUpdate for an update from build 1
+        then:
+          - it: returns the permissions expected for the update from build 1
+      - when: Calling prepareUpdate for an update from build 2
+        then:
+          - it: returns the permissions expected for the update from build 2
+      - when: Calling prepareUpdate for an update from build 3
+        then:
+          - it: returns the permissions expected for the update from build 3 (empty list)
+  - given: The context is prepareUninstallation
+    and:
+      - when: Calling prepareUninstallation and helpers contain a GovernanceWrappedERC20 token
+        then:
+          - it: correctly returns permissions, when the required number of helpers is supplied
+      - when: Calling prepareUninstallation and helpers contain a GovernanceERC20 token
+        then:
+          - it: correctly returns permissions, when the required number of helpers is supplied

@@ -1,0 +1,26 @@
+UpgradingTest:
+  - when: Upgrading to a new implementation
+    then:
+      - it: upgrades to a new implementation
+
+  - given: The contract is at v1.0.0
+    and:
+      - when: Upgrading with `initializeFrom`
+        then:
+          - it: Upgrades from v1.0.0 with `initializeFrom`
+          - it: The old `initialize` function fails during the upgrade
+          - it: initializeFrom succeeds
+          - it: protocol versions are updated correctly
+          - it: new settings are applied
+          - it: the original `initialize` function is disabled post-upgrade
+
+  - given: The contract is at v1.3.0
+    and:
+      - when: Upgrading with `initializeFrom`
+        then:
+          - it: upgrades from v1.3.0 with `initializeFrom`
+          - it: The old `initialize` function fails during the upgrade
+          - it: initializeFrom succeeds
+          - it: protocol versions are updated correctly
+          - it: new settings are applied
+          - it: the original `initialize` function is disabled post-upgrade
