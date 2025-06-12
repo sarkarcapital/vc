@@ -6,7 +6,11 @@ import {TestBase} from "../lib/TestBase.sol";
 import {DAO} from "@aragon/osx/core/dao/DAO.sol";
 import {TokenVotingSetup} from "../../src/TokenVotingSetup.sol";
 import {TokenVoting} from "../../src/TokenVoting.sol";
+import {GovernanceERC20} from "../../src/erc20/GovernanceERC20.sol";
+import {MajorityVotingBase} from "../../src/base/MajorityVotingBase.sol";
 import {ProxyLib} from "@aragon/osx-commons-contracts/src/utils/deployment/ProxyLib.sol";
+import {IPlugin} from "@aragon/osx-commons-contracts/src/plugin/IPlugin.sol";
+import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
 
 contract SimpleBuilder is TestBase {
     address immutable DAO_BASE = address(new DAO());
@@ -14,8 +18,21 @@ contract SimpleBuilder is TestBase {
 
     // Parameters to override
     address daoOwner; // Used for testing purposes only
-    address[] managers; // daoOwner will be used if eventually empty
-    uint256 initialNumber = 1;
+
+    MajorityVotingBase.VotingMode votingMode =
+        MajorityVotingBase.VotingMode.Standard;
+    uint32 supportThreshold = 500_000; // 50%
+    uint32 minParticipation = 100_000; // 10%
+    uint64 minDuration = 60 * 60; // 1h
+    uint256 minProposerVotingPower;
+
+    IVotesUpgradeable token;
+    address[] newTokenHolders;
+    uint256[] newTokenBalances;
+    address targetAddress;
+    IPlugin.Operation targetOperation;
+    uint256 minApprovals;
+    bytes pluginMetadata;
 
     constructor() {
         // Set the caller as the initial daoOwner
@@ -26,6 +43,95 @@ contract SimpleBuilder is TestBase {
     // Override methods
     function withDaoOwner(address _newOwner) public returns (SimpleBuilder) {
         daoOwner = _newOwner;
+        return this;
+    }
+
+    function withEarlyExecution() public returns (SimpleBuilder) {
+        votingMode = MajorityVotingBase.VotingMode.EarlyExecution;
+        return this;
+    }
+
+    function withVoteReplacement() public returns (SimpleBuilder) {
+        votingMode = MajorityVotingBase.VotingMode.VoteReplacement;
+        return this;
+    }
+
+    function withSupportThreshold(
+        uint32 _newThreshold
+    ) public returns (SimpleBuilder) {
+        supportThreshold = _newThreshold;
+        return this;
+    }
+
+    function withMinParticipation(
+        uint32 _newValue
+    ) public returns (SimpleBuilder) {
+        minParticipation = _newValue;
+        return this;
+    }
+
+    function withMinDuration(uint64 _newValue) public returns (SimpleBuilder) {
+        minDuration = _newValue;
+        return this;
+    }
+
+    function withMinApprovals(uint64 _newValue) public returns (SimpleBuilder) {
+        minApprovals = _newValue;
+        return this;
+    }
+
+    function withMinProposerVotingPower(
+        uint256 _newValue
+    ) public returns (SimpleBuilder) {
+        minProposerVotingPower = _newValue;
+        return this;
+    }
+
+    // Use the given token
+    function withToken(
+        IVotesUpgradeable _newToken
+    ) public returns (SimpleBuilder) {
+        token = _newToken;
+        return this;
+    }
+
+    // A list of token holders, all with the same balance
+    function withNewToken(
+        address[] memory _holders,
+        uint256 _balance
+    ) public returns (SimpleBuilder) {
+        for (uint256 i = 0; i < _holders.length; i++) {
+            newTokenHolders.push(_holders[i]);
+            newTokenBalances.push(_balance);
+        }
+        return this;
+    }
+
+    // A list of token holders, each with their own balance
+    function withNewToken(
+        address[] memory _holders,
+        uint256[] memory _balances
+    ) public returns (SimpleBuilder) {
+        for (uint256 i = 0; i < _holders.length; i++) {
+            newTokenHolders.push(_holders[i]);
+            newTokenBalances.push(_balances[i]);
+        }
+        return this;
+    }
+
+    function withTargetConfig(
+        address _target,
+        IPlugin.Operation _operation
+    ) public returns (SimpleBuilder) {
+        targetAddress = _target;
+        targetOperation = _operation;
+        return this;
+    }
+
+    function withPluginMetadata(
+        bytes memory _newValue
+    ) public returns (SimpleBuilder) {
+        pluginMetadata = _newValue;
         return this;
     }
 
@@ -45,41 +151,76 @@ contract SimpleBuilder is TestBase {
             )
         );
 
-        // Plugin
+        // Plugin params
+        if (address(token) == address(0)) {
+            if (newTokenHolders.length != newTokenBalances.length) {
+                revert("Mismatch between token holders and balances count");
+            } else if (newTokenHolders.length == 0) {
+                // Fallback: Mint a token with `msg.sender`
+                newTokenHolders.push(msg.sender);
+                newTokenBalances.push(1000 ether);
+            }
+
+            token = new GovernanceERC20(
+                dao,
+                "MyToken",
+                "SYM",
+                GovernanceERC20.MintSettings(newTokenHolders, newTokenBalances)
+            );
+        }
+
+        // Target the DAO by default
+        if (targetAddress == address(0)) {
+            targetAddress = address(dao);
+        }
+        IPlugin.TargetConfig memory targetConfig = IPlugin.TargetConfig(
+            targetAddress,
+            targetOperation
+        );
+
+        MajorityVotingBase.VotingSettings
+            memory votingSettings = MajorityVotingBase.VotingSettings({
+                votingMode: votingMode,
+                supportThreshold: supportThreshold,
+                minParticipation: minParticipation,
+                minDuration: minDuration,
+                minProposerVotingPower: minProposerVotingPower
+            });
+
+        // Deploy the plugin
         plugin = TokenVoting(
             ProxyLib.deployUUPSProxy(
                 address(TOKEN_VOTING_PLUGIN_BASE),
-                abi.encodeCall(TokenVoting.initialize, (dao, initialNumber))
+                abi.encodeCall(
+                    TokenVoting.initialize,
+                    (
+                        dao,
+                        votingSettings,
+                        token,
+                        targetConfig,
+                        minApprovals,
+                        pluginMetadata
+                    )
+                )
             )
         );
 
         vm.startPrank(daoOwner);
 
-        // // Grant plugin permissions
-        // if (managers.length > 0) {
-        //     for (uint256 i = 0; i < managers.length; i++) {
-        //         dao.grant(
-        //             address(plugin),
-        //             managers[i],
-        //             plugin.MANAGER_PERMISSION_ID()
-        //         );
-        //     }
-        // } else {
-        //     // Set the daoOwner as the plugin manager if no managers are defined
-        //     dao.grant(
-        //         address(plugin),
-        //         daoOwner,
-        //         plugin.MANAGER_PERMISSION_ID()
-        //     );
-        // }
+        // Allow the plugin to execute on the DAO
+        dao.grant(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID());
+
+        // Make the DAO ROOT on itself
+        dao.grant(address(dao), address(dao), dao.ROOT_PERMISSION_ID());
 
         vm.stopPrank();
 
         // Labels
         vm.label(address(dao), "DAO");
         vm.label(address(plugin), "TokenVoting");
+        vm.label(address(token), "Token");
 
-        // Moving forward to avoid collisions
+        // Moving forward to ensure that snapshots are ready
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
     }
