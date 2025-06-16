@@ -117,7 +117,7 @@ contract SimpleBuilder is TestBase {
 
     /// @dev Creates a DAO with the given orchestration settings.
     /// @dev The setup is done on block/timestamp 0 and tests should be made on block/timestamp 1 or later.
-    function build() public returns (DAO dao, TokenVoting plugin) {
+    function build() public returns (DAO dao, TokenVoting plugin, IVotesUpgradeable token_) {
         // Deploy the DAO with `daoOwner` as ROOT
         dao = DAO(
             payable(
@@ -141,6 +141,7 @@ contract SimpleBuilder is TestBase {
                 dao, "MyToken", "SYM", GovernanceERC20.MintSettings(newTokenHolders, newTokenBalances)
             );
         }
+        token_ = token;
 
         // Target the DAO by default
         if (targetAddress == address(0)) {
