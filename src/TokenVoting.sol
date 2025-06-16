@@ -27,8 +27,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
     using SafeCastUpgradeable for uint256;
 
     /// @notice The [ERC-165](https://eips.ethereum.org/EIPS/eip-165) interface ID of the contract.
-    bytes4 internal constant TOKEN_VOTING_INTERFACE_ID =
-        this.getVotingToken.selector;
+    bytes4 internal constant TOKEN_VOTING_INTERFACE_ID = this.getVotingToken.selector;
 
     /// @notice An [OpenZeppelin `Votes`](https://docs.openzeppelin.com/contracts/4.x/api/governance#Votes)
     ///         compatible contract referencing the token being used for voting.
@@ -56,13 +55,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         uint256 _minApprovals,
         bytes calldata _pluginMetadata
     ) external onlyCallAtInitialization reinitializer(2) {
-        __MajorityVotingBase_init(
-            _dao,
-            _votingSettings,
-            _targetConfig,
-            _minApprovals,
-            _pluginMetadata
-        );
+        __MajorityVotingBase_init(_dao, _votingSettings, _targetConfig, _minApprovals, _pluginMetadata);
 
         votingToken = _token;
 
@@ -77,16 +70,10 @@ contract TokenVoting is IMembership, MajorityVotingBase {
     /// @param _fromBuild Build version number of previous implementation contract this upgrade is transitioning from.
     /// @param _initData The initialization data to be passed to via `upgradeToAndCall`
     ///     (see [ERC-1967](https://docs.openzeppelin.com/contracts/4.x/api/proxy#ERC1967Upgrade)).
-    function initializeFrom(
-        uint16 _fromBuild,
-        bytes calldata _initData
-    ) external reinitializer(2) {
+    function initializeFrom(uint16 _fromBuild, bytes calldata _initData) external reinitializer(2) {
         if (_fromBuild < 3) {
-            (
-                uint256 minApprovals,
-                TargetConfig memory targetConfig,
-                bytes memory pluginMetadata
-            ) = abi.decode(_initData, (uint256, TargetConfig, bytes));
+            (uint256 minApprovals, TargetConfig memory targetConfig, bytes memory pluginMetadata) =
+                abi.decode(_initData, (uint256, TargetConfig, bytes));
 
             _updateMinApprovals(minApprovals);
 
@@ -99,13 +86,9 @@ contract TokenVoting is IMembership, MajorityVotingBase {
     /// @notice Checks if this or the parent contract supports an interface by its ID.
     /// @param _interfaceId The ID of the interface.
     /// @return Returns `true` if the interface is supported.
-    function supportsInterface(
-        bytes4 _interfaceId
-    ) public view virtual override returns (bool) {
-        return
-            _interfaceId == TOKEN_VOTING_INTERFACE_ID ||
-            _interfaceId == type(IMembership).interfaceId ||
-            super.supportsInterface(_interfaceId);
+    function supportsInterface(bytes4 _interfaceId) public view virtual override returns (bool) {
+        return _interfaceId == TOKEN_VOTING_INTERFACE_ID || _interfaceId == type(IMembership).interfaceId
+            || super.supportsInterface(_interfaceId);
     }
 
     /// @notice getter function for the voting token.
@@ -117,9 +100,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
     }
 
     /// @inheritdoc MajorityVotingBase
-    function totalVotingPower(
-        uint256 _blockNumber
-    ) public view override returns (uint256) {
+    function totalVotingPower(uint256 _blockNumber) public view override returns (uint256) {
         return votingToken.getPastTotalSupply(_blockNumber);
     }
 
@@ -133,12 +114,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         uint64 _endDate,
         VoteOption _voteOption,
         bool _tryEarlyExecution
-    )
-        public
-        override
-        auth(CREATE_PROPOSAL_PERMISSION_ID)
-        returns (uint256 proposalId)
-    {
+    ) public override auth(CREATE_PROPOSAL_PERMISSION_ID) returns (uint256 proposalId) {
         uint256 snapshotBlock;
         unchecked {
             // The snapshot block must be mined already to
@@ -154,9 +130,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
 
         (_startDate, _endDate) = _validateProposalDates(_startDate, _endDate);
 
-        proposalId = _createProposalId(
-            keccak256(abi.encode(_actions, _metadata))
-        );
+        proposalId = _createProposalId(keccak256(abi.encode(_actions, _metadata)));
 
         // Store proposal related information
         Proposal storage proposal_ = proposals[proposalId];
@@ -170,15 +144,9 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         proposal_.parameters.snapshotBlock = snapshotBlock.toUint64();
         proposal_.parameters.votingMode = votingMode();
         proposal_.parameters.supportThreshold = supportThreshold();
-        proposal_.parameters.minVotingPower = _applyRatioCeiled(
-            totalVotingPower_,
-            minParticipation()
-        );
+        proposal_.parameters.minVotingPower = _applyRatioCeiled(totalVotingPower_, minParticipation());
 
-        proposal_.minApprovalPower = _applyRatioCeiled(
-            totalVotingPower_,
-            minApproval()
-        );
+        proposal_.minApprovalPower = _applyRatioCeiled(totalVotingPower_, minApproval());
 
         proposal_.targetConfig = getTargetConfig();
 
@@ -187,7 +155,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
             proposal_.allowFailureMap = _allowFailureMap;
         }
 
-        for (uint256 i; i < _actions.length; ) {
+        for (uint256 i; i < _actions.length;) {
             proposal_.actions.push(_actions[i]);
             unchecked {
                 ++i;
@@ -198,14 +166,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
             vote(proposalId, _voteOption, _tryEarlyExecution);
         }
 
-        _emitProposalCreatedEvent(
-            _metadata,
-            _actions,
-            _allowFailureMap,
-            proposalId,
-            _startDate,
-            _endDate
-        );
+        _emitProposalCreatedEvent(_metadata, _actions, _allowFailureMap, proposalId, _startDate, _endDate);
     }
 
     /// @inheritdoc IProposal
@@ -222,56 +183,33 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         bool tryEarlyExecution;
 
         if (_data.length != 0) {
-            (allowFailureMap, _voteOption, tryEarlyExecution) = abi.decode(
-                _data,
-                (uint256, VoteOption, bool)
-            );
+            (allowFailureMap, _voteOption, tryEarlyExecution) = abi.decode(_data, (uint256, VoteOption, bool));
         }
 
-        proposalId = createProposal(
-            _metadata,
-            _actions,
-            allowFailureMap,
-            _startDate,
-            _endDate,
-            _voteOption,
-            tryEarlyExecution
-        );
+        proposalId =
+            createProposal(_metadata, _actions, allowFailureMap, _startDate, _endDate, _voteOption, tryEarlyExecution);
     }
 
     /// @inheritdoc IProposal
-    function customProposalParamsABI()
-        external
-        pure
-        override
-        returns (string memory)
-    {
-        return
-            "(uint256 allowFailureMap, uint8 voteOption, bool tryEarlyExecution)";
+    function customProposalParamsABI() external pure override returns (string memory) {
+        return "(uint256 allowFailureMap, uint8 voteOption, bool tryEarlyExecution)";
     }
 
     /// @inheritdoc IMembership
     function isMember(address _account) external view returns (bool) {
         // A member must own at least one token or have at least one token delegated to her/him.
-        return
-            votingToken.getVotes(_account) > 0 ||
-            IERC20Upgradeable(address(votingToken)).balanceOf(_account) > 0;
+        return votingToken.getVotes(_account) > 0 || IERC20Upgradeable(address(votingToken)).balanceOf(_account) > 0;
     }
 
     /// @inheritdoc MajorityVotingBase
-    function _vote(
-        uint256 _proposalId,
-        VoteOption _voteOption,
-        address _voter,
-        bool _tryEarlyExecution
-    ) internal override {
+    function _vote(uint256 _proposalId, VoteOption _voteOption, address _voter, bool _tryEarlyExecution)
+        internal
+        override
+    {
         Proposal storage proposal_ = proposals[_proposalId];
 
         // This could re-enter, though we can assume the governance token is not malicious
-        uint256 votingPower = votingToken.getPastVotes(
-            _voter,
-            proposal_.parameters.snapshotBlock
-        );
+        uint256 votingPower = votingToken.getPastVotes(_voter, proposal_.parameters.snapshotBlock);
         VoteOption state = proposal_.voters[_voter];
 
         // If voter had previously voted, decrease count
@@ -294,36 +232,27 @@ contract TokenVoting is IMembership, MajorityVotingBase {
 
         proposal_.voters[_voter] = _voteOption;
 
-        emit VoteCast({
-            proposalId: _proposalId,
-            voter: _voter,
-            voteOption: _voteOption,
-            votingPower: votingPower
-        });
+        emit VoteCast({proposalId: _proposalId, voter: _voter, voteOption: _voteOption, votingPower: votingPower});
 
         if (!_tryEarlyExecution) {
             return;
         }
 
         if (
-            _canExecute(_proposalId) &&
-            dao().hasPermission(
-                address(this),
-                _voter,
-                EXECUTE_PROPOSAL_PERMISSION_ID,
-                _msgData()
-            )
+            _canExecute(_proposalId)
+                && dao().hasPermission(address(this), _voter, EXECUTE_PROPOSAL_PERMISSION_ID, _msgData())
         ) {
             _execute(_proposalId);
         }
     }
 
     /// @inheritdoc MajorityVotingBase
-    function _canVote(
-        uint256 _proposalId,
-        address _account,
-        VoteOption _voteOption
-    ) internal view override returns (bool) {
+    function _canVote(uint256 _proposalId, address _account, VoteOption _voteOption)
+        internal
+        view
+        override
+        returns (bool)
+    {
         Proposal storage proposal_ = proposals[_proposalId];
 
         // The proposal vote hasn't started or has already ended.
@@ -337,19 +266,14 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         }
 
         // The voter has no voting power.
-        if (
-            votingToken.getPastVotes(
-                _account,
-                proposal_.parameters.snapshotBlock
-            ) == 0
-        ) {
+        if (votingToken.getPastVotes(_account, proposal_.parameters.snapshotBlock) == 0) {
             return false;
         }
 
         // The voter has already voted but vote replacment is not allowed.
         if (
-            proposal_.voters[_account] != VoteOption.None &&
-            proposal_.parameters.votingMode != VotingMode.VoteReplacement
+            proposal_.voters[_account] != VoteOption.None
+                && proposal_.parameters.votingMode != VotingMode.VoteReplacement
         ) {
             return false;
         }
@@ -366,15 +290,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         uint64 _startDate,
         uint64 _endDate
     ) private {
-        emit ProposalCreated(
-            proposalId,
-            _msgSender(),
-            _startDate,
-            _endDate,
-            _metadata,
-            _actions,
-            _allowFailureMap
-        );
+        emit ProposalCreated(proposalId, _msgSender(), _startDate, _endDate, _metadata, _actions, _allowFailureMap);
     }
 
     /// @dev This empty reserved space is put in place to allow future versions to add new

@@ -24,8 +24,7 @@ contract ForkBuilder is ForkTestBase {
     address immutable UPGRADEABLE_PLUGIN_BASE = address(new TokenVoting());
 
     // Add your own parameters here
-    MajorityVotingBase.VotingMode votingMode =
-        MajorityVotingBase.VotingMode.Standard;
+    MajorityVotingBase.VotingMode votingMode = MajorityVotingBase.VotingMode.Standard;
     uint32 supportThreshold = 500_000; // 50%
     uint32 minParticipation = 100_000; // 10%
     uint64 minDuration = 60 * 60; // 1h
@@ -50,16 +49,12 @@ contract ForkBuilder is ForkTestBase {
         return this;
     }
 
-    function withSupportThreshold(
-        uint32 _newThreshold
-    ) public returns (ForkBuilder) {
+    function withSupportThreshold(uint32 _newThreshold) public returns (ForkBuilder) {
         supportThreshold = _newThreshold;
         return this;
     }
 
-    function withMinParticipation(
-        uint32 _newValue
-    ) public returns (ForkBuilder) {
+    function withMinParticipation(uint32 _newValue) public returns (ForkBuilder) {
         minParticipation = _newValue;
         return this;
     }
@@ -74,26 +69,19 @@ contract ForkBuilder is ForkTestBase {
         return this;
     }
 
-    function withMinProposerVotingPower(
-        uint256 _newValue
-    ) public returns (ForkBuilder) {
+    function withMinProposerVotingPower(uint256 _newValue) public returns (ForkBuilder) {
         minProposerVotingPower = _newValue;
         return this;
     }
 
     // Use the given token
-    function withToken(
-        IVotesUpgradeable _newToken
-    ) public returns (ForkBuilder) {
+    function withToken(IVotesUpgradeable _newToken) public returns (ForkBuilder) {
         token = _newToken;
         return this;
     }
 
     // A list of token holders, all with the same balance
-    function withNewToken(
-        address[] memory _holders,
-        uint256 _balance
-    ) public returns (ForkBuilder) {
+    function withNewToken(address[] memory _holders, uint256 _balance) public returns (ForkBuilder) {
         for (uint256 i = 0; i < _holders.length; i++) {
             newTokenHolders.push(_holders[i]);
             newTokenBalances.push(_balance);
@@ -102,10 +90,7 @@ contract ForkBuilder is ForkTestBase {
     }
 
     // A list of token holders, each with their own balance
-    function withNewToken(
-        address[] memory _holders,
-        uint256[] memory _balances
-    ) public returns (ForkBuilder) {
+    function withNewToken(address[] memory _holders, uint256[] memory _balances) public returns (ForkBuilder) {
         for (uint256 i = 0; i < _holders.length; i++) {
             newTokenHolders.push(_holders[i]);
             newTokenBalances.push(_balances[i]);
@@ -113,18 +98,13 @@ contract ForkBuilder is ForkTestBase {
         return this;
     }
 
-    function withTargetConfig(
-        address _target,
-        IPlugin.Operation _operation
-    ) public returns (ForkBuilder) {
+    function withTargetConfig(address _target, IPlugin.Operation _operation) public returns (ForkBuilder) {
         targetAddress = _target;
         targetOperation = _operation;
         return this;
     }
 
-    function withPluginMetadata(
-        bytes memory _newValue
-    ) public returns (ForkBuilder) {
+    function withPluginMetadata(bytes memory _newValue) public returns (ForkBuilder) {
         pluginMetadata = _newValue;
         return this;
     }
@@ -133,35 +113,18 @@ contract ForkBuilder is ForkTestBase {
     /// @dev The setup is done on block/timestamp 0 and tests should be made on block/timestamp 1 or later.
     function build()
         public
-        returns (
-            DAO dao,
-            PluginRepo pluginRepo,
-            TokenVotingSetup pluginSetup,
-            TokenVoting plugin
-        )
+        returns (DAO dao, PluginRepo pluginRepo, TokenVotingSetup pluginSetup, TokenVoting plugin)
     {
         // Dependency implementations
         GovernanceERC20 governanceERC20 = new GovernanceERC20(
-            IDAO(address(0)),
-            "",
-            "",
-            GovernanceERC20.MintSettings(new address[](0), new uint256[](0))
+            IDAO(address(0)), "", "", GovernanceERC20.MintSettings(new address[](0), new uint256[](0))
         );
-        GovernanceWrappedERC20 governanceWrappedERC20 = new GovernanceWrappedERC20(
-                IERC20Upgradeable(address(0)),
-                "",
-                ""
-            );
+        GovernanceWrappedERC20 governanceWrappedERC20 =
+            new GovernanceWrappedERC20(IERC20Upgradeable(address(0)), "", "");
 
         // Prepare a plugin repo with an initial version and subdomain
-        string memory pluginRepoSubdomain = string.concat(
-            "my-token-voting-plugin-",
-            vm.toString(block.timestamp)
-        );
-        pluginSetup = new TokenVotingSetup(
-            governanceERC20,
-            governanceWrappedERC20
-        );
+        string memory pluginRepoSubdomain = string.concat("my-token-voting-plugin-", vm.toString(block.timestamp));
+        pluginSetup = new TokenVotingSetup(governanceERC20, governanceWrappedERC20);
         pluginRepo = pluginRepoFactory.createPluginRepoWithFirstVersion({
             _subdomain: string(pluginRepoSubdomain),
             _pluginSetup: address(pluginSetup),
@@ -171,16 +134,11 @@ contract ForkBuilder is ForkTestBase {
         });
 
         // DAO settings
-        DAOFactory.DAOSettings memory daoSettings = DAOFactory.DAOSettings({
-            trustedForwarder: address(0),
-            daoURI: "http://host/",
-            subdomain: "",
-            metadata: ""
-        });
+        DAOFactory.DAOSettings memory daoSettings =
+            DAOFactory.DAOSettings({trustedForwarder: address(0), daoURI: "http://host/", subdomain: "", metadata: ""});
 
         // Define what plugin(s) to install and give the corresponding parameters
-        DAOFactory.PluginSettings[]
-            memory installSettings = new DAOFactory.PluginSettings[](1);
+        DAOFactory.PluginSettings[] memory installSettings = new DAOFactory.PluginSettings[](1);
 
         // Token voting params
         if (address(token) == address(0)) {
@@ -192,10 +150,7 @@ contract ForkBuilder is ForkTestBase {
                 newTokenBalances.push(1000 ether);
             }
             token = new GovernanceERC20(
-                dao,
-                "MyToken",
-                "SYM",
-                GovernanceERC20.MintSettings(newTokenHolders, newTokenBalances)
+                dao, "MyToken", "SYM", GovernanceERC20.MintSettings(newTokenHolders, newTokenBalances)
             );
         }
 
@@ -203,26 +158,18 @@ contract ForkBuilder is ForkTestBase {
         if (targetAddress == address(0)) {
             targetAddress = address(dao);
         }
-        IPlugin.TargetConfig memory targetConfig = IPlugin.TargetConfig(
-            targetAddress,
-            targetOperation
-        );
-        MajorityVotingBase.VotingSettings
-            memory votingSettings = MajorityVotingBase.VotingSettings({
-                votingMode: votingMode,
-                supportThreshold: supportThreshold,
-                minParticipation: minParticipation,
-                minDuration: minDuration,
-                minProposerVotingPower: minProposerVotingPower
-            });
+        IPlugin.TargetConfig memory targetConfig = IPlugin.TargetConfig(targetAddress, targetOperation);
+        MajorityVotingBase.VotingSettings memory votingSettings = MajorityVotingBase.VotingSettings({
+            votingMode: votingMode,
+            supportThreshold: supportThreshold,
+            minParticipation: minParticipation,
+            minDuration: minDuration,
+            minProposerVotingPower: minProposerVotingPower
+        });
 
         bytes memory pluginInstallData = abi.encode(
             votingSettings,
-            TokenVotingSetup.TokenSettings({
-                addr: address(token),
-                name: "TokenName",
-                symbol: "SYM"
-            }),
+            TokenVotingSetup.TokenSettings({addr: address(token), name: "TokenName", symbol: "SYM"}),
             // only used for GovernanceERC20(token is not passed)
             GovernanceERC20.MintSettings(new address[](0), new uint256[](0)),
             targetConfig,
@@ -230,19 +177,13 @@ contract ForkBuilder is ForkTestBase {
             pluginMetadata
         );
         installSettings[0] = DAOFactory.PluginSettings({
-            pluginSetupRef: PluginSetupRef({
-                versionTag: getLatestTag(pluginRepo),
-                pluginSetupRepo: pluginRepo
-            }),
+            pluginSetupRef: PluginSetupRef({versionTag: getLatestTag(pluginRepo), pluginSetupRepo: pluginRepo}),
             data: pluginInstallData
         });
 
         // Create DAO with the plugin
         DAOFactory.InstalledPlugin[] memory installedPlugins;
-        (dao, installedPlugins) = daoFactory.createDao(
-            daoSettings,
-            installSettings
-        );
+        (dao, installedPlugins) = daoFactory.createDao(daoSettings, installSettings);
         plugin = TokenVoting(installedPlugins[0].plugin);
 
         // Labels

@@ -36,24 +36,19 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
     using ProxyLib for address;
 
     /// @notice The identifier of the `EXECUTE_PERMISSION` permission.
-    bytes32 private constant EXECUTE_PERMISSION_ID =
-        keccak256("EXECUTE_PERMISSION");
+    bytes32 private constant EXECUTE_PERMISSION_ID = keccak256("EXECUTE_PERMISSION");
 
     /// @notice The ID of the permission required to call the `setTargetConfig` function.
-    bytes32 private constant SET_TARGET_CONFIG_PERMISSION_ID =
-        keccak256("SET_TARGET_CONFIG_PERMISSION");
+    bytes32 private constant SET_TARGET_CONFIG_PERMISSION_ID = keccak256("SET_TARGET_CONFIG_PERMISSION");
 
     /// @notice The ID of the permission required to call the `setMetadata` function.
-    bytes32 private constant SET_METADATA_PERMISSION_ID =
-        keccak256("SET_METADATA_PERMISSION");
+    bytes32 private constant SET_METADATA_PERMISSION_ID = keccak256("SET_METADATA_PERMISSION");
 
     /// @notice The ID of the permission required to call the `upgradeToAndCall` function.
-    bytes32 private constant UPGRADE_PLUGIN_PERMISSION_ID =
-        keccak256("UPGRADE_PLUGIN_PERMISSION");
+    bytes32 private constant UPGRADE_PLUGIN_PERMISSION_ID = keccak256("UPGRADE_PLUGIN_PERMISSION");
 
     /// @notice The ID of the permission required to call the `execute` function.
-    bytes32 private constant EXECUTE_PROPOSAL_PERMISSION_ID =
-        keccak256("EXECUTE_PROPOSAL_PERMISSION");
+    bytes32 private constant EXECUTE_PROPOSAL_PERMISSION_ID = keccak256("EXECUTE_PROPOSAL_PERMISSION");
 
     /// @notice A special address encoding permissions that are valid for any address `who` or `where`.
     address private constant ANY_ADDR = address(type(uint160).max);
@@ -94,20 +89,16 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
     ///     and receiving the governance token base contracts to clone from.
     /// @param _governanceERC20Base The base `GovernanceERC20` contract to create clones from.
     /// @param _governanceWrappedERC20Base The base `GovernanceWrappedERC20` contract to create clones from.
-    constructor(
-        GovernanceERC20 _governanceERC20Base,
-        GovernanceWrappedERC20 _governanceWrappedERC20Base
-    ) PluginUpgradeableSetup(address(new TokenVoting())) {
+    constructor(GovernanceERC20 _governanceERC20Base, GovernanceWrappedERC20 _governanceWrappedERC20Base)
+        PluginUpgradeableSetup(address(new TokenVoting()))
+    {
         tokenVotingBase = TokenVoting(IMPLEMENTATION);
         governanceERC20Base = address(_governanceERC20Base);
         governanceWrappedERC20Base = address(_governanceWrappedERC20Base);
     }
 
     /// @inheritdoc IPluginSetup
-    function prepareInstallation(
-        address _dao,
-        bytes calldata _data
-    )
+    function prepareInstallation(address _dao, bytes calldata _data)
         external
         returns (address plugin, PreparedSetupData memory preparedSetupData)
     {
@@ -122,16 +113,16 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
             uint256 minApprovals,
             bytes memory pluginMetadata
         ) = abi.decode(
-                _data,
-                (
-                    MajorityVotingBase.VotingSettings,
-                    TokenSettings,
-                    GovernanceERC20.MintSettings,
-                    IPlugin.TargetConfig,
-                    uint256,
-                    bytes
-                )
-            );
+            _data,
+            (
+                MajorityVotingBase.VotingSettings,
+                TokenSettings,
+                GovernanceERC20.MintSettings,
+                IPlugin.TargetConfig,
+                uint256,
+                bytes
+            )
+        );
 
         address token = tokenSettings.addr;
 
@@ -150,48 +141,30 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
                 // GovernanceWrappedERC20 in order to make the token
                 // include governance functionality.
                 GovernanceWrappedERC20(token).initialize(
-                    IERC20Upgradeable(tokenSettings.addr),
-                    tokenSettings.name,
-                    tokenSettings.symbol
+                    IERC20Upgradeable(tokenSettings.addr), tokenSettings.name, tokenSettings.symbol
                 );
             }
         } else {
             // Clone a `GovernanceERC20`.
             token = governanceERC20Base.clone();
-            GovernanceERC20(token).initialize(
-                IDAO(_dao),
-                tokenSettings.name,
-                tokenSettings.symbol,
-                mintSettings
-            );
+            GovernanceERC20(token).initialize(IDAO(_dao), tokenSettings.name, tokenSettings.symbol, mintSettings);
         }
 
         // Prepare and deploy plugin proxy.
         plugin = address(tokenVotingBase).deployUUPSProxy(
             abi.encodeCall(
                 TokenVoting.initialize,
-                (
-                    IDAO(_dao),
-                    votingSettings,
-                    IVotesUpgradeable(token),
-                    targetConfig,
-                    minApprovals,
-                    pluginMetadata
-                )
+                (IDAO(_dao), votingSettings, IVotesUpgradeable(token), targetConfig, minApprovals, pluginMetadata)
             )
         );
 
         preparedSetupData.helpers = new address[](2);
-        preparedSetupData.helpers[0] = address(
-            new VotingPowerCondition(plugin)
-        );
+        preparedSetupData.helpers[0] = address(new VotingPowerCondition(plugin));
         preparedSetupData.helpers[1] = token;
 
         // Prepare permissions
-        PermissionLib.MultiTargetPermission[]
-            memory permissions = new PermissionLib.MultiTargetPermission[](
-                tokenSettings.addr != address(0) ? 6 : 7
-            );
+        PermissionLib.MultiTargetPermission[] memory permissions =
+            new PermissionLib.MultiTargetPermission[](tokenSettings.addr != address(0) ? 6 : 7);
 
         // Set plugin permissions to be granted.
         // Grant the list of permissions of the plugin to the DAO.
@@ -245,8 +218,7 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
         });
 
         if (tokenSettings.addr == address(0)) {
-            bytes32 tokenMintPermission = GovernanceERC20(token)
-                .MINT_PERMISSION_ID();
+            bytes32 tokenMintPermission = GovernanceERC20(token).MINT_PERMISSION_ID();
 
             permissions[6] = PermissionLib.MultiTargetPermission({
                 operation: PermissionLib.Operation.Grant,
@@ -262,27 +234,15 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
 
     /// @inheritdoc IPluginSetup
     /// @dev Revoke the upgrade plugin permission to the DAO for all builds prior the current one (3).
-    function prepareUpdate(
-        address _dao,
-        uint16 _fromBuild,
-        SetupPayload calldata _payload
-    )
+    function prepareUpdate(address _dao, uint16 _fromBuild, SetupPayload calldata _payload)
         external
         override
-        returns (
-            bytes memory initData,
-            PreparedSetupData memory preparedSetupData
-        )
+        returns (bytes memory initData, PreparedSetupData memory preparedSetupData)
     {
         if (_fromBuild < 3) {
-            address votingPowerCondition = address(
-                new VotingPowerCondition(_payload.plugin)
-            );
+            address votingPowerCondition = address(new VotingPowerCondition(_payload.plugin));
 
-            PermissionLib.MultiTargetPermission[]
-                memory permissions = new PermissionLib.MultiTargetPermission[](
-                    5
-                );
+            PermissionLib.MultiTargetPermission[] memory permissions = new PermissionLib.MultiTargetPermission[](5);
 
             permissions[0] = PermissionLib.MultiTargetPermission({
                 operation: PermissionLib.Operation.Revoke,
@@ -328,18 +288,12 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
             preparedSetupData.helpers = new address[](1);
             preparedSetupData.helpers[0] = votingPowerCondition;
 
-            initData = abi.encodeCall(
-                TokenVoting.initializeFrom,
-                (_fromBuild, _payload.data)
-            );
+            initData = abi.encodeCall(TokenVoting.initializeFrom, (_fromBuild, _payload.data));
         }
     }
 
     /// @inheritdoc IPluginSetup
-    function prepareUninstallation(
-        address _dao,
-        SetupPayload calldata _payload
-    )
+    function prepareUninstallation(address _dao, SetupPayload calldata _payload)
         external
         view
         returns (PermissionLib.MultiTargetPermission[] memory permissions)
@@ -385,8 +339,7 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
             where: _payload.plugin,
             who: ANY_ADDR, // ANY_ADDR
             condition: PermissionLib.NO_CONDITION,
-            permissionId: TokenVoting(IMPLEMENTATION)
-                .CREATE_PROPOSAL_PERMISSION_ID()
+            permissionId: TokenVoting(IMPLEMENTATION).CREATE_PROPOSAL_PERMISSION_ID()
         });
 
         permissions[5] = PermissionLib.MultiTargetPermission({
@@ -401,41 +354,23 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
     /// @notice Unsatisfiably determines if the token is an IVotes interface.
     /// @dev Many tokens don't use ERC165 even though they still support IVotes.
     function supportsIVotesInterface(address token) public view returns (bool) {
-        (bool success1, bytes memory data1) = token.staticcall(
-            abi.encodeWithSelector(
-                IVotesUpgradeable.getPastTotalSupply.selector,
-                0
-            )
-        );
-        (bool success2, bytes memory data2) = token.staticcall(
-            abi.encodeWithSelector(
-                IVotesUpgradeable.getVotes.selector,
-                address(this)
-            )
-        );
-        (bool success3, bytes memory data3) = token.staticcall(
-            abi.encodeWithSelector(
-                IVotesUpgradeable.getPastVotes.selector,
-                address(this),
-                0
-            )
-        );
+        (bool success1, bytes memory data1) =
+            token.staticcall(abi.encodeWithSelector(IVotesUpgradeable.getPastTotalSupply.selector, 0));
+        (bool success2, bytes memory data2) =
+            token.staticcall(abi.encodeWithSelector(IVotesUpgradeable.getVotes.selector, address(this)));
+        (bool success3, bytes memory data3) =
+            token.staticcall(abi.encodeWithSelector(IVotesUpgradeable.getPastVotes.selector, address(this), 0));
 
-        return (success1 &&
-            data1.length == 0x20 &&
-            success2 &&
-            data2.length == 0x20 &&
-            success3 &&
-            data3.length == 0x20);
+        return
+            (success1 && data1.length == 0x20 && success2 && data2.length == 0x20 && success3 && data3.length == 0x20);
     }
 
     /// @notice Unsatisfiably determines if the contract is an ERC20 token.
     /// @dev It's important to first check whether token is a contract prior to this call.
     /// @param token The token address
     function _isERC20(address token) private view returns (bool) {
-        (bool success, bytes memory data) = token.staticcall(
-            abi.encodeCall(IERC20Upgradeable.balanceOf, (address(this)))
-        );
+        (bool success, bytes memory data) =
+            token.staticcall(abi.encodeCall(IERC20Upgradeable.balanceOf, (address(this))));
         return success && data.length == 0x20;
     }
 }

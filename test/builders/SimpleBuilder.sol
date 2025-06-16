@@ -19,8 +19,7 @@ contract SimpleBuilder is TestBase {
     // Parameters to override
     address daoOwner; // Used for testing purposes only
 
-    MajorityVotingBase.VotingMode votingMode =
-        MajorityVotingBase.VotingMode.Standard;
+    MajorityVotingBase.VotingMode votingMode = MajorityVotingBase.VotingMode.Standard;
     uint32 supportThreshold = 500_000; // 50%
     uint32 minParticipation = 100_000; // 10%
     uint64 minDuration = 60 * 60; // 1h
@@ -56,16 +55,12 @@ contract SimpleBuilder is TestBase {
         return this;
     }
 
-    function withSupportThreshold(
-        uint32 _newThreshold
-    ) public returns (SimpleBuilder) {
+    function withSupportThreshold(uint32 _newThreshold) public returns (SimpleBuilder) {
         supportThreshold = _newThreshold;
         return this;
     }
 
-    function withMinParticipation(
-        uint32 _newValue
-    ) public returns (SimpleBuilder) {
+    function withMinParticipation(uint32 _newValue) public returns (SimpleBuilder) {
         minParticipation = _newValue;
         return this;
     }
@@ -80,26 +75,19 @@ contract SimpleBuilder is TestBase {
         return this;
     }
 
-    function withMinProposerVotingPower(
-        uint256 _newValue
-    ) public returns (SimpleBuilder) {
+    function withMinProposerVotingPower(uint256 _newValue) public returns (SimpleBuilder) {
         minProposerVotingPower = _newValue;
         return this;
     }
 
     // Use the given token
-    function withToken(
-        IVotesUpgradeable _newToken
-    ) public returns (SimpleBuilder) {
+    function withToken(IVotesUpgradeable _newToken) public returns (SimpleBuilder) {
         token = _newToken;
         return this;
     }
 
     // A list of token holders, all with the same balance
-    function withNewToken(
-        address[] memory _holders,
-        uint256 _balance
-    ) public returns (SimpleBuilder) {
+    function withNewToken(address[] memory _holders, uint256 _balance) public returns (SimpleBuilder) {
         for (uint256 i = 0; i < _holders.length; i++) {
             newTokenHolders.push(_holders[i]);
             newTokenBalances.push(_balance);
@@ -108,10 +96,7 @@ contract SimpleBuilder is TestBase {
     }
 
     // A list of token holders, each with their own balance
-    function withNewToken(
-        address[] memory _holders,
-        uint256[] memory _balances
-    ) public returns (SimpleBuilder) {
+    function withNewToken(address[] memory _holders, uint256[] memory _balances) public returns (SimpleBuilder) {
         for (uint256 i = 0; i < _holders.length; i++) {
             newTokenHolders.push(_holders[i]);
             newTokenBalances.push(_balances[i]);
@@ -119,18 +104,13 @@ contract SimpleBuilder is TestBase {
         return this;
     }
 
-    function withTargetConfig(
-        address _target,
-        IPlugin.Operation _operation
-    ) public returns (SimpleBuilder) {
+    function withTargetConfig(address _target, IPlugin.Operation _operation) public returns (SimpleBuilder) {
         targetAddress = _target;
         targetOperation = _operation;
         return this;
     }
 
-    function withPluginMetadata(
-        bytes memory _newValue
-    ) public returns (SimpleBuilder) {
+    function withPluginMetadata(bytes memory _newValue) public returns (SimpleBuilder) {
         pluginMetadata = _newValue;
         return this;
     }
@@ -142,11 +122,7 @@ contract SimpleBuilder is TestBase {
         dao = DAO(
             payable(
                 ProxyLib.deployUUPSProxy(
-                    address(DAO_BASE),
-                    abi.encodeCall(
-                        DAO.initialize,
-                        ("", daoOwner, address(0x0), "")
-                    )
+                    address(DAO_BASE), abi.encodeCall(DAO.initialize, ("", daoOwner, address(0x0), ""))
                 )
             )
         );
@@ -162,10 +138,7 @@ contract SimpleBuilder is TestBase {
             }
 
             token = new GovernanceERC20(
-                dao,
-                "MyToken",
-                "SYM",
-                GovernanceERC20.MintSettings(newTokenHolders, newTokenBalances)
+                dao, "MyToken", "SYM", GovernanceERC20.MintSettings(newTokenHolders, newTokenBalances)
             );
         }
 
@@ -173,34 +146,22 @@ contract SimpleBuilder is TestBase {
         if (targetAddress == address(0)) {
             targetAddress = address(dao);
         }
-        IPlugin.TargetConfig memory targetConfig = IPlugin.TargetConfig(
-            targetAddress,
-            targetOperation
-        );
+        IPlugin.TargetConfig memory targetConfig = IPlugin.TargetConfig(targetAddress, targetOperation);
 
-        MajorityVotingBase.VotingSettings
-            memory votingSettings = MajorityVotingBase.VotingSettings({
-                votingMode: votingMode,
-                supportThreshold: supportThreshold,
-                minParticipation: minParticipation,
-                minDuration: minDuration,
-                minProposerVotingPower: minProposerVotingPower
-            });
+        MajorityVotingBase.VotingSettings memory votingSettings = MajorityVotingBase.VotingSettings({
+            votingMode: votingMode,
+            supportThreshold: supportThreshold,
+            minParticipation: minParticipation,
+            minDuration: minDuration,
+            minProposerVotingPower: minProposerVotingPower
+        });
 
         // Deploy the plugin
         plugin = TokenVoting(
             ProxyLib.deployUUPSProxy(
                 address(TOKEN_VOTING_PLUGIN_BASE),
                 abi.encodeCall(
-                    TokenVoting.initialize,
-                    (
-                        dao,
-                        votingSettings,
-                        token,
-                        targetConfig,
-                        minApprovals,
-                        pluginMetadata
-                    )
+                    TokenVoting.initialize, (dao, votingSettings, token, targetConfig, minApprovals, pluginMetadata)
                 )
             )
         );

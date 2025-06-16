@@ -53,9 +53,7 @@ contract DeployScript is Script {
         // https://github.com/aragon/osx/blob/main/packages/artifacts/src/addresses.json
 
         // Prepare the OSx factories for the current network
-        pluginRepoFactory = PluginRepoFactory(
-            vm.envAddress("PLUGIN_REPO_FACTORY_ADDRESS")
-        );
+        pluginRepoFactory = PluginRepoFactory(vm.envAddress("PLUGIN_REPO_FACTORY_ADDRESS"));
         vm.label(address(pluginRepoFactory), "PluginRepoFactory");
 
         // Read the rest of environment variables
@@ -63,15 +61,10 @@ contract DeployScript is Script {
 
         // Using a random subdomain if empty
         if (bytes(pluginEnsSubdomain).length == 0) {
-            pluginEnsSubdomain = string.concat(
-                "my-test-token-voting-plugin-",
-                vm.toString(block.timestamp)
-            );
+            pluginEnsSubdomain = string.concat("my-token-voting-plugin-", vm.toString(block.timestamp));
         }
 
-        pluginRepoMaintainerAddress = vm.envAddress(
-            "PLUGIN_REPO_MAINTAINER_ADDRESS"
-        );
+        pluginRepoMaintainerAddress = vm.envAddress("PLUGIN_REPO_MAINTAINER_ADDRESS");
         vm.label(pluginRepoMaintainerAddress, "Maintainer");
     }
 
@@ -91,68 +84,38 @@ contract DeployScript is Script {
     function deployPluginRepo() public {
         // Dependency implementations
         GovernanceERC20 governanceERC20 = new GovernanceERC20(
-            IDAO(address(0)),
-            "",
-            "",
-            GovernanceERC20.MintSettings(new address[](0), new uint256[](0))
+            IDAO(address(0)), "", "", GovernanceERC20.MintSettings(new address[](0), new uint256[](0))
         );
-        GovernanceWrappedERC20 governanceWrappedERC20 = new GovernanceWrappedERC20(
-                IERC20Upgradeable(address(0)),
-                "",
-                ""
-            );
+        GovernanceWrappedERC20 governanceWrappedERC20 =
+            new GovernanceWrappedERC20(IERC20Upgradeable(address(0)), "", "");
 
         // Plugin setup (the installer)
-        pluginSetup = new TokenVotingSetup(
-            governanceERC20,
-            governanceWrappedERC20
-        );
+        pluginSetup = new TokenVotingSetup(governanceERC20, governanceWrappedERC20);
 
         // The new plugin repository
         // Publish the plugin in a new repo as release 1, build 1
         myPluginRepo = pluginRepoFactory.createPluginRepoWithFirstVersion(
-            pluginEnsSubdomain,
-            address(pluginSetup),
-            pluginRepoMaintainerAddress,
-            " ",
-            " "
+            pluginEnsSubdomain, address(pluginSetup), pluginRepoMaintainerAddress, " ", " "
         );
     }
 
     function printDeployment() public view {
         console2.log("TokenVoting plugin:");
         console2.log("- Plugin repo:               ", address(myPluginRepo));
-        console2.log(
-            "- Plugin repo maintainer:    ",
-            pluginRepoMaintainerAddress
-        );
-        console2.log(
-            "- ENS:                       ",
-            string.concat(pluginEnsSubdomain, ".plugin.dao.eth")
-        );
+        console2.log("- Plugin repo maintainer:    ", pluginRepoMaintainerAddress);
+        console2.log("- ENS:                       ", string.concat(pluginEnsSubdomain, ".plugin.dao.eth"));
         console2.log("");
     }
 
     function writeJsonArtifacts() internal {
         string memory artifacts = "output";
         artifacts.serialize("pluginRepo", address(myPluginRepo));
-        artifacts.serialize(
-            "pluginRepoMaintainer",
-            pluginRepoMaintainerAddress
-        );
-        artifacts = artifacts.serialize(
-            "pluginEnsDomain",
-            string.concat(pluginEnsSubdomain, ".plugin.dao.eth")
-        );
+        artifacts.serialize("pluginRepoMaintainer", pluginRepoMaintainerAddress);
+        artifacts = artifacts.serialize("pluginEnsDomain", string.concat(pluginEnsSubdomain, ".plugin.dao.eth"));
 
         string memory networkName = vm.envString("NETWORK_NAME");
         string memory filePath = string.concat(
-            vm.projectRoot(),
-            "/artifacts/deployment-",
-            networkName,
-            "-",
-            vm.toString(block.timestamp),
-            ".json"
+            vm.projectRoot(), "/artifacts/deployment-", networkName, "-", vm.toString(block.timestamp), ".json"
         );
         artifacts.write(filePath);
 
