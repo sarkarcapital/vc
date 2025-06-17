@@ -16,12 +16,12 @@ import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20
 /**
  * This script performs the following tasks:
  * - Deploys a new PluginRepo
- * - Publishes a new version (release 1, build 1)
+ * - Publishes the first version (release 1, build 1)
  *
  * The full plugin deployment should be made from the Protocol Factory.
  * This script is provided for separate ad-hoc deployments.
  */
-contract DeployScript is Script {
+contract DeployPluginRepoScript is Script {
     using stdJson for string;
 
     address deployer;

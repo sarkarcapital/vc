@@ -299,7 +299,7 @@ When running a production deployment ceremony, you can use these steps as a refe
 - [ ] I have uploaded the following files to a shared location:
   - `logs/deployment-<network>.log` (the last one)
   - `artifacts/deployment-<network>-<timestamp>.json`  (the last one)
-  - `broadcast/Deploy.s.sol/<chain-id>/run-<timestamp>.json` (the last one, or `run-latest.json`)
+  - `broadcast/DeployPluginRepo.s.sol/<chain-id>/run-<timestamp>.json` (the last one, or `run-latest.json`)
 - [ ] The rest of members confirm that the values are correct
 - [ ] I have transferred the remaining funds of the deployment wallet to the address that originally funded it
   - `make refund`
@@ -322,7 +322,7 @@ Verification:
 - make verify-sourcify    Verify the last deployment on Sourcify
 ```
 
-These targets use the last deployment data under `broadcast/Deploy.s.sol/<chain-id>/run-latest.json`.
+These targets use the last deployment data under `broadcast/DeployPluginRepo.s.sol/<chain-id>/run-latest.json`.
 - Ensure that the required variables are set within the `.env` file.
 - Ensure that `NETWORK_NAME` is listed on the right section under `constants.mk`, according to the block explorer that you want to target
 
