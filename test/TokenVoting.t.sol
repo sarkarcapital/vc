@@ -14,21 +14,73 @@ contract TokenVotingTest is TestBase {
     TokenVoting plugin;
 
     modifier givenInTheInitializeContext() {
+        // Setup shared across initialize tests
+        (dao,, token) = new SimpleBuilder().withDaoOwner(alice).build();
         _;
     }
 
-    function test_WhenCallingInitializeOnAnAlreadyInitializedPlugin() external givenInTheInitializeContext {
-        // It reverts if trying to re-initialize
-        vm.skip(true);
+    function test_WhenCallingInitializeOnAnAlreadyInitializedPlugin() external {
+        // GIVEN an already initialized plugin
+        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).build();
+
+        // WHEN calling initialize again
+        // THEN it reverts
+        vm.expectRevert(PluginUUPSUpgradeable.AlreadyInitialized.selector);
+        plugin.initialize(
+            dao,
+            MajorityVotingBase.VotingSettings({
+                votingMode: MajorityVotingBase.VotingMode.Standard,
+                supportThreshold: 500_000,
+                minParticipation: 100_000,
+                minDuration: ONE_HOUR,
+                minProposerVotingPower: 0
+            }),
+            plugin.getVotingToken(),
+            IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call),
+            0,
+            ""
+        );
     }
 
-    function test_WhenCallingInitializeOnAnUninitializedPlugin() external givenInTheInitializeContext {
-        // It emits the `MembershipContractAnnounced` event
-        // It sets the voting settings, token, minimal approval and metadata
-        vm.skip(true);
+    function test_WhenCallingInitializeOnAnUninitializedPlugin() external {
+        // GIVEN an uninitialized plugin proxy
+        address base = address(new TokenVoting());
+        (dao,,) = new SimpleBuilder().withDaoOwner(alice).withNewToken(new address[](0), new uint256[](0)).build();
+        token = plugin.getVotingToken();
+
+        address proxy = ProxyLib.deployUUPSProxy(base, "");
+        plugin = TokenVoting(proxy);
+
+        // WHEN calling initialize
+        MajorityVotingBase.VotingSettings memory settings = MajorityVotingBase.VotingSettings({
+            votingMode: MajorityVotingBase.VotingMode.EarlyExecution,
+            supportThreshold: 400_000, // 40%
+            minParticipation: 200_000, // 20%
+            minDuration: ONE_DAY,
+            minProposerVotingPower: 1 ether
+        });
+        uint256 minApprovals = 100_000; // 10%
+        bytes memory metadata = "ipfs://1234";
+
+        vm.expectEmit(true, true, true, true, address(plugin));
+        emit IMembership.MembershipContractAnnounced(address(token));
+
+        plugin.initialize(
+            dao, settings, token, IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call), minApprovals, metadata
+        );
+
+        // THEN it sets the voting settings, token, minimal approval and metadata
+        assertEq(uint8(plugin.votingMode()), uint8(settings.votingMode));
+        assertEq(plugin.supportThreshold(), settings.supportThreshold);
+        assertEq(plugin.minParticipation(), settings.minParticipation);
+        assertEq(plugin.minDuration(), settings.minDuration);
+        assertEq(plugin.minProposerVotingPower(), settings.minProposerVotingPower);
+        assertEq(address(plugin.getVotingToken()), address(token));
+        assertEq(plugin.minApproval(), minApprovals);
     }
 
     modifier givenInTheERC165Context() {
+        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).build();
         _;
     }
 
