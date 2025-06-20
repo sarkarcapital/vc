@@ -170,9 +170,9 @@ contract TokenVotingSetupTest is TestBase {
         bytes memory data = _getInstallationData();
 
         uint256 nonce = vm.getNonce(address(pluginSetup));
-        address anticipatedWrappedTokenAddress = computeCreateAddress(address(pluginSetup), nonce);
-        address anticipatedPluginAddress = computeCreateAddress(address(pluginSetup), nonce + 1);
-        address anticipatedCondition = computeCreateAddress(address(pluginSetup), nonce + 2);
+        address anticipatedWrappedTokenAddress = vm.computeCreateAddress(address(pluginSetup), nonce);
+        address anticipatedPluginAddress = vm.computeCreateAddress(address(pluginSetup), nonce + 1);
+        address anticipatedCondition = vm.computeCreateAddress(address(pluginSetup), nonce + 2);
 
         (address plugin, IPluginSetup.PreparedSetupData memory prepared) =
             pluginSetup.prepareInstallation(address(dao), data);
@@ -264,8 +264,8 @@ contract TokenVotingSetupTest is TestBase {
         bytes memory data = _getInstallationData();
 
         uint256 nonce = vm.getNonce(address(pluginSetup));
-        address anticipatedPluginAddress = computeCreateAddress(address(pluginSetup), nonce);
-        address anticipatedCondition = computeCreateAddress(address(pluginSetup), nonce + 1);
+        address anticipatedPluginAddress = vm.computeCreateAddress(address(pluginSetup), nonce);
+        address anticipatedCondition = vm.computeCreateAddress(address(pluginSetup), nonce + 1);
 
         (address plugin, IPluginSetup.PreparedSetupData memory prepared) =
             pluginSetup.prepareInstallation(address(dao), data);
@@ -286,9 +286,9 @@ contract TokenVotingSetupTest is TestBase {
         bytes memory data = _getInstallationData();
 
         uint256 nonce = vm.getNonce(address(pluginSetup));
-        address anticipatedTokenAddress = computeCreateAddress(address(pluginSetup), nonce);
-        address anticipatedPluginAddress = computeCreateAddress(address(pluginSetup), nonce + 1);
-        address anticipatedCondition = computeCreateAddress(address(pluginSetup), nonce + 2);
+        address anticipatedTokenAddress = vm.computeCreateAddress(address(pluginSetup), nonce);
+        address anticipatedPluginAddress = vm.computeCreateAddress(address(pluginSetup), nonce + 1);
+        address anticipatedCondition = vm.computeCreateAddress(address(pluginSetup), nonce + 2);
 
         (address plugin, IPluginSetup.PreparedSetupData memory prepared) =
             pluginSetup.prepareInstallation(address(dao), data);
@@ -337,12 +337,132 @@ contract TokenVotingSetupTest is TestBase {
 
     function test_WhenCallingPrepareUpdateForAnUpdateFromBuild1() external givenTheContextIsPrepareUpdate {
         // It returns the permissions expected for the update from build 1
-        vm.skip(true);
+        TokenVoting plugin;
+        (dao, plugin,,) = new SimpleBuilder().build();
+
+        bytes memory updateInnerData =
+            abi.encode(uint256(0), IPlugin.TargetConfig(address(0), IPlugin.Operation.Call), "");
+        IPluginSetup.SetupPayload memory updatePayload = IPluginSetup.SetupPayload({
+            plugin: address(plugin),
+            currentHelpers: new address[](2),
+            data: updateInnerData
+        });
+
+        uint256 nonce = vm.getNonce(address(pluginSetup));
+        address anticipatedCondition = vm.computeCreateAddress(address(pluginSetup), nonce);
+
+        (bytes memory initData, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareUpdate(address(dao), 1, updatePayload);
+
+        assertEq(initData, abi.encodeWithSelector(TokenVoting.initializeFrom.selector, 1, updateInnerData));
+        assertEq(prepared.helpers.length, 1);
+        assertEq(prepared.helpers[0], anticipatedCondition);
+        assertEq(prepared.permissions.length, 5);
+
+        _assertPermission(
+            prepared.permissions[0],
+            PermissionLib.Operation.Revoke,
+            address(plugin),
+            address(dao),
+            address(0),
+            keccak256("UPGRADE_PLUGIN_PERMISSION")
+        );
+        _assertPermission(
+            prepared.permissions[1],
+            PermissionLib.Operation.GrantWithCondition,
+            address(plugin),
+            ANY_ADDR,
+            anticipatedCondition,
+            keccak256("CREATE_PROPOSAL_PERMISSION")
+        );
+        _assertPermission(
+            prepared.permissions[2],
+            PermissionLib.Operation.Grant,
+            address(plugin),
+            address(dao),
+            address(0),
+            keccak256("SET_TARGET_CONFIG_PERMISSION")
+        );
+        _assertPermission(
+            prepared.permissions[3],
+            PermissionLib.Operation.Grant,
+            address(plugin),
+            address(dao),
+            address(0),
+            keccak256("SET_METADATA_PERMISSION")
+        );
+        _assertPermission(
+            prepared.permissions[4],
+            PermissionLib.Operation.Grant,
+            address(plugin),
+            ANY_ADDR,
+            address(0),
+            keccak256("EXECUTE_PROPOSAL_PERMISSION")
+        );
     }
 
     function test_WhenCallingPrepareUpdateForAnUpdateFromBuild2() external givenTheContextIsPrepareUpdate {
         // It returns the permissions expected for the update from build 2
-        vm.skip(true);
+        TokenVoting plugin;
+        (dao, plugin,,) = new SimpleBuilder().build();
+
+        uint256 nonce = vm.getNonce(address(pluginSetup));
+        address anticipatedCondition = vm.computeCreateAddress(address(pluginSetup), nonce);
+
+        bytes memory updateInnerData =
+            abi.encode(uint256(0), IPlugin.TargetConfig(address(0), IPlugin.Operation.Call), "");
+        IPluginSetup.SetupPayload memory updatePayload = IPluginSetup.SetupPayload({
+            plugin: address(plugin),
+            currentHelpers: new address[](2),
+            data: updateInnerData
+        });
+
+        (bytes memory initData, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareUpdate(address(dao), 2, updatePayload);
+
+        assertEq(initData, abi.encodeWithSelector(TokenVoting.initializeFrom.selector, 2, updateInnerData));
+        assertEq(prepared.permissions.length, 5);
+
+        _assertPermission(
+            prepared.permissions[0],
+            PermissionLib.Operation.Revoke,
+            address(plugin),
+            address(dao),
+            address(0),
+            keccak256("UPGRADE_PLUGIN_PERMISSION")
+        );
+        _assertPermission(
+            prepared.permissions[1],
+            PermissionLib.Operation.GrantWithCondition,
+            address(plugin),
+            ANY_ADDR,
+            anticipatedCondition,
+            keccak256("CREATE_PROPOSAL_PERMISSION")
+        );
+        _assertPermission(
+            prepared.permissions[2],
+            PermissionLib.Operation.Grant,
+            address(plugin),
+            address(dao),
+            address(0),
+            keccak256("SET_TARGET_CONFIG_PERMISSION")
+        );
+        _assertPermission(
+            prepared.permissions[3],
+            PermissionLib.Operation.Grant,
+            address(plugin),
+            address(dao),
+            address(0),
+            keccak256("SET_METADATA_PERMISSION")
+        );
+        _assertPermission(
+            prepared.permissions[4],
+            PermissionLib.Operation.Grant,
+            address(plugin),
+            ANY_ADDR,
+            address(0),
+            keccak256("EXECUTE_PROPOSAL_PERMISSION")
+        );
     }
 
     function test_WhenCallingPrepareUpdateForAnUpdateFromBuild3() external givenTheContextIsPrepareUpdate {
