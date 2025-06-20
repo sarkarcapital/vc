@@ -1252,6 +1252,11 @@ contract TokenVotingTest is TestBase {
     }
 
     modifier givenAnEdgeCaseWithSupportThreshold0MinParticipation0MinApproval0InEarlyExecutionMode() {
+        (dao, plugin,,) = new SimpleBuilder().withEarlyExecution().withSupportThreshold(0).withMinParticipation(0)
+            .withMinApprovals(0).build();
+
+        dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
+
         _;
     }
 
@@ -1260,7 +1265,11 @@ contract TokenVotingTest is TestBase {
         givenAnEdgeCaseWithSupportThreshold0MinParticipation0MinApproval0InEarlyExecutionMode
     {
         // It does not execute with 0 votes
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(alice);
+        assertFalse(plugin.canExecute(proposalId));
+        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        vm.warp(params.endDate);
+        assertFalse(plugin.canExecute(proposalId));
     }
 
     function test_WhenThereIsAtLeastOneYesVote()
@@ -1268,14 +1277,38 @@ contract TokenVotingTest is TestBase {
         givenAnEdgeCaseWithSupportThreshold0MinParticipation0MinApproval0InEarlyExecutionMode
     {
         // It executes if participation, support and min approval are met
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(alice);
+        assertFalse(plugin.canExecute(proposalId));
+
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+
+        assertTrue(plugin.canExecute(proposalId));
     }
 
     modifier givenAnEdgeCaseWithSupportThreshold999999MinParticipation100AndMinApproval100InEarlyExecutionMode() {
+        builder = new SimpleBuilder().withEarlyExecution().withSupportThreshold(RATIO_BASE - 1).withMinParticipation(
+            RATIO_BASE
+        ).withMinApprovals(RATIO_BASE);
+
         _;
     }
 
     modifier givenTokenBalancesAreInTheMagnitudeOf1018() {
+        uint256 totalSupply = 10 ** 18;
+        uint256 delta = totalSupply / RATIO_BASE; // 10**12
+        address[] memory holders = new address[](3);
+        holders[0] = alice;
+        holders[1] = bob;
+        holders[2] = carol;
+        uint256[] memory balances = new uint256[](3);
+        balances[0] = totalSupply - delta;
+        balances[1] = 1;
+        balances[2] = delta - 1;
+
+        (dao, plugin,,) = builder.withNewToken(holders, balances).build();
+
+        dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
+
         _;
     }
 
@@ -1285,7 +1318,16 @@ contract TokenVotingTest is TestBase {
         givenTokenBalancesAreInTheMagnitudeOf1018
     {
         // It early support criterion is sharp by 1 vote
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(alice);
+        assertFalse(plugin.isSupportThresholdReachedEarly(proposalId));
+
+        vm.prank(alice);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        assertFalse(plugin.isMinParticipationReached(proposalId));
+
+        vm.prank(bob);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        assertTrue(plugin.isSupportThresholdReachedEarly(proposalId));
     }
 
     function test_WhenTheNumberOfCastedVotesIsOneShyOf100Participation()
@@ -1294,10 +1336,34 @@ contract TokenVotingTest is TestBase {
         givenTokenBalancesAreInTheMagnitudeOf1018
     {
         // It participation criterion is sharp by 1 vote
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(alice);
+
+        vm.prank(alice);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        assertFalse(plugin.isMinParticipationReached(proposalId));
+
+        vm.prank(carol);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        assertFalse(plugin.isMinParticipationReached(proposalId));
+
+        vm.prank(bob);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        assertTrue(plugin.isMinParticipationReached(proposalId));
     }
 
     modifier givenTokenBalancesAreInTheMagnitudeOf106() {
+        uint256 totalSupply = 10 ** 6;
+        uint256 delta = 1; // 1 vote is 0.0001% of total supply
+        address[] memory holders = new address[](2);
+        holders[0] = alice;
+        holders[1] = bob;
+        uint256[] memory balances = new uint256[](2);
+        balances[0] = totalSupply - delta;
+        balances[1] = delta;
+
+        (dao, plugin,,) = builder.withNewToken(holders, balances).build();
+        dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
+
         _;
     }
 
@@ -1307,7 +1373,16 @@ contract TokenVotingTest is TestBase {
         givenTokenBalancesAreInTheMagnitudeOf106
     {
         // It early support criterion is sharp by 1 vote
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(alice);
+        assertFalse(plugin.isSupportThresholdReachedEarly(proposalId));
+
+        vm.prank(alice);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        assertFalse(plugin.isSupportThresholdReachedEarly(proposalId));
+
+        vm.prank(bob);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        assertTrue(plugin.isSupportThresholdReachedEarly(proposalId));
     }
 
     function test_WhenTheNumberOfCastedVotesIsOneShyOf100Participation2()
@@ -1316,106 +1391,94 @@ contract TokenVotingTest is TestBase {
         givenTokenBalancesAreInTheMagnitudeOf106
     {
         // It participation is not met with 1 vote missing
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(alice);
+        assertFalse(plugin.isMinParticipationReached(proposalId));
+
+        vm.prank(alice);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        assertFalse(plugin.isMinParticipationReached(proposalId));
+
+        vm.prank(bob);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        assertTrue(plugin.isMinParticipationReached(proposalId));
     }
 
-    modifier givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude() {
-        _;
+    function _runMagnitudeTest(uint256 power) internal {
+        uint256 baseUnit = 10 ** power;
+        address[] memory holders = new address[](2);
+        holders[0] = alice;
+        holders[1] = bob;
+        uint256[] memory balances = new uint256[](2);
+        balances[0] = baseUnit * 5 + 1;
+        balances[1] = baseUnit * 5;
+
+        (dao, plugin,,) = new SimpleBuilder().withEarlyExecution().withNewToken(holders, balances).build();
+        dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
+
+        uint256 proposalId = _createDummyProposal(alice);
+
+        vm.prank(alice);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+
+        assertTrue(plugin.isSupportThresholdReached(proposalId));
+        assertTrue(plugin.isMinParticipationReached(proposalId));
+        assertTrue(plugin.isSupportThresholdReachedEarly(proposalId));
+        assertTrue(plugin.canExecute(proposalId));
+
+        vm.prank(bob);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
+
+        assertTrue(plugin.isSupportThresholdReached(proposalId));
+        assertTrue(plugin.isMinParticipationReached(proposalId));
+        assertTrue(plugin.isSupportThresholdReachedEarly(proposalId));
+        assertTrue(plugin.canExecute(proposalId));
     }
 
-    function test_WhenTestingWithAMagnitudeOf100()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^0
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_0() external {
+        _runMagnitudeTest(0);
     }
 
-    function test_WhenTestingWithAMagnitudeOf101()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^1
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_1() external {
+        _runMagnitudeTest(1);
     }
 
-    function test_WhenTestingWithAMagnitudeOf102()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^2
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_2() external {
+        _runMagnitudeTest(2);
     }
 
-    function test_WhenTestingWithAMagnitudeOf103()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^3
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_3() external {
+        _runMagnitudeTest(3);
     }
 
-    function test_WhenTestingWithAMagnitudeOf106()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^6
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_6() external {
+        _runMagnitudeTest(6);
     }
 
-    function test_WhenTestingWithAMagnitudeOf1012()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^12
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_12() external {
+        _runMagnitudeTest(12);
     }
 
-    function test_WhenTestingWithAMagnitudeOf1018()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^18
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_18() external {
+        _runMagnitudeTest(18);
     }
 
-    function test_WhenTestingWithAMagnitudeOf1024()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^24
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_24() external {
+        _runMagnitudeTest(24);
     }
 
-    function test_WhenTestingWithAMagnitudeOf1036()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^36
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_36() external {
+        _runMagnitudeTest(36);
     }
 
-    function test_WhenTestingWithAMagnitudeOf1048()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^48
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_48() external {
+        _runMagnitudeTest(48);
     }
 
-    function test_WhenTestingWithAMagnitudeOf1060()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^60
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_60() external {
+        _runMagnitudeTest(60);
     }
 
-    function test_WhenTestingWithAMagnitudeOf1066()
-        external
-        givenExecutionCriteriaHandleTokenBalancesForMultipleOrdersOfMagnitude
-    {
-        // It magnitudes of 10^66
-        vm.skip(true);
+    function test_WhenTestingWithAMagnitudeOf10_66() external {
+        _runMagnitudeTest(66);
     }
 }

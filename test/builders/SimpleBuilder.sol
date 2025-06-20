@@ -142,11 +142,12 @@ contract SimpleBuilder is TestBase {
                 newTokenBalances.push(1000 ether);
             }
 
-            token = new GovernanceERC20(
+            token_ = new GovernanceERC20(
                 dao, "MyToken", "SYM", GovernanceERC20.MintSettings(newTokenHolders, newTokenBalances)
             );
+        } else {
+            token_ = token;
         }
-        token_ = token;
 
         // Target the DAO by default
         if (targetAddress == address(0)) {
@@ -167,15 +168,15 @@ contract SimpleBuilder is TestBase {
             ProxyLib.deployUUPSProxy(
                 address(TOKEN_VOTING_PLUGIN_BASE),
                 abi.encodeCall(
-                    TokenVoting.initialize, (dao, votingSettings, token, targetConfig, minApprovals, pluginMetadata)
+                    TokenVoting.initialize, (dao, votingSettings, token_, targetConfig, minApprovals, pluginMetadata)
                 )
             )
         );
 
         vm.startPrank(daoOwner);
 
+        // Allow anyone with enough balance to create proposals (only if set)
         if (minProposerVotingPower > 0) {
-            // Allow anyone with enough balance to create proposals
             condition = new VotingPowerCondition(address(plugin));
             dao.grantWithCondition(address(plugin), ANY_ADDR, plugin.CREATE_PROPOSAL_PERMISSION_ID(), condition);
         }
@@ -191,7 +192,7 @@ contract SimpleBuilder is TestBase {
         // Labels
         vm.label(address(dao), "DAO");
         vm.label(address(plugin), "TokenVoting");
-        vm.label(address(token), "Token");
+        vm.label(address(token_), "Token");
 
         // Moving forward to ensure that snapshots are ready
         vm.roll(block.number + 1);
