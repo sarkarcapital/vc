@@ -22,6 +22,7 @@ contract TokenVotingSetupTest is TestBase {
     // Permission IDs
     bytes32 constant UPDATE_VOTING_SETTINGS_PERMISSION_ID = keccak256("UPDATE_VOTING_SETTINGS_PERMISSION");
     bytes32 constant CREATE_PROPOSAL_PERMISSION_ID = keccak256("CREATE_PROPOSAL_PERMISSION");
+    bytes32 constant EXECUTE_PROPOSAL_PERMISSION_ID = keccak256("EXECUTE_PROPOSAL_PERMISSION");
     bytes32 constant MINT_PERMISSION_ID = keccak256("MINT_PERMISSION");
     bytes32 constant SET_METADATA_PERMISSION_ID = keccak256("SET_METADATA_PERMISSION");
     bytes32 constant SET_TARGET_CONFIG_PERMISSION_ID = keccak256("SET_TARGET_CONFIG_PERMISSION");
@@ -346,7 +347,18 @@ contract TokenVotingSetupTest is TestBase {
 
     function test_WhenCallingPrepareUpdateForAnUpdateFromBuild3() external givenTheContextIsPrepareUpdate {
         // It returns the permissions expected for the update from build 3 (empty list)
-        vm.skip(true);
+        address pluginAddr = makeAddr("plugin");
+        bytes memory updateInnerData =
+            abi.encode(uint256(0), IPlugin.TargetConfig(address(0), IPlugin.Operation.Call), "");
+        IPluginSetup.SetupPayload memory updatePayload =
+            IPluginSetup.SetupPayload({plugin: pluginAddr, currentHelpers: new address[](2), data: updateInnerData});
+
+        (bytes memory initData, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareUpdate(address(dao), 3, updatePayload);
+
+        assertEq(initData.length, 0);
+        assertEq(prepared.helpers.length, 0);
+        assertEq(prepared.permissions.length, 0);
     }
 
     modifier givenTheContextIsPrepareUninstallation() {
@@ -358,7 +370,70 @@ contract TokenVotingSetupTest is TestBase {
         givenTheContextIsPrepareUninstallation
     {
         // It correctly returns permissions, when the required number of helpers is supplied
-        vm.skip(true);
+        address pluginAddr = makeAddr("plugin");
+        address conditionAddr = makeAddr("condition");
+        GovernanceWrappedERC20 wrappedToken =
+            new GovernanceWrappedERC20(IERC20Upgradeable(makeAddr("underlying")), "W", "W");
+
+        address[] memory helpers = new address[](2);
+        helpers[0] = conditionAddr;
+        helpers[1] = address(wrappedToken);
+
+        IPluginSetup.SetupPayload memory payload =
+            IPluginSetup.SetupPayload({plugin: pluginAddr, currentHelpers: helpers, data: ""});
+
+        PermissionLib.MultiTargetPermission[] memory permissions =
+            pluginSetup.prepareUninstallation(address(dao), payload);
+
+        assertEq(permissions.length, 6);
+        _assertPermission(
+            permissions[0],
+            PermissionLib.Operation.Revoke,
+            pluginAddr,
+            address(dao),
+            address(0),
+            UPDATE_VOTING_SETTINGS_PERMISSION_ID
+        );
+        _assertPermission(
+            permissions[1],
+            PermissionLib.Operation.Revoke,
+            address(dao),
+            pluginAddr,
+            address(0),
+            dao.EXECUTE_PERMISSION_ID()
+        );
+        _assertPermission(
+            permissions[2],
+            PermissionLib.Operation.Revoke,
+            pluginAddr,
+            address(dao),
+            address(0),
+            SET_TARGET_CONFIG_PERMISSION_ID
+        );
+        _assertPermission(
+            permissions[3],
+            PermissionLib.Operation.Revoke,
+            pluginAddr,
+            address(dao),
+            address(0),
+            SET_METADATA_PERMISSION_ID
+        );
+        _assertPermission(
+            permissions[4],
+            PermissionLib.Operation.Revoke,
+            pluginAddr,
+            ANY_ADDR,
+            address(0),
+            CREATE_PROPOSAL_PERMISSION_ID
+        );
+        _assertPermission(
+            permissions[5],
+            PermissionLib.Operation.Revoke,
+            pluginAddr,
+            ANY_ADDR,
+            address(0),
+            EXECUTE_PROPOSAL_PERMISSION_ID
+        );
     }
 
     function test_WhenCallingPrepareUninstallationAndHelpersContainAGovernanceERC20Token()
@@ -366,6 +441,29 @@ contract TokenVotingSetupTest is TestBase {
         givenTheContextIsPrepareUninstallation
     {
         // It correctly returns permissions, when the required number of helpers is supplied
-        vm.skip(true);
+        address pluginAddr = makeAddr("plugin");
+        address conditionAddr = makeAddr("condition");
+        GovernanceERC20 govToken = new GovernanceERC20(IDAO(address(dao)), "G", "G", defaultMintSettings);
+
+        address[] memory helpers = new address[](2);
+        helpers[0] = conditionAddr;
+        helpers[1] = address(govToken);
+
+        IPluginSetup.SetupPayload memory payload =
+            IPluginSetup.SetupPayload({plugin: pluginAddr, currentHelpers: helpers, data: ""});
+
+        PermissionLib.MultiTargetPermission[] memory permissions =
+            pluginSetup.prepareUninstallation(address(dao), payload);
+
+        // The list of permissions to revoke is identical regardless of the token type.
+        assertEq(permissions.length, 6);
+        _assertPermission(
+            permissions[0],
+            PermissionLib.Operation.Revoke,
+            pluginAddr,
+            address(dao),
+            address(0),
+            UPDATE_VOTING_SETTINGS_PERMISSION_ID
+        );
     }
 }
