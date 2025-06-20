@@ -8,6 +8,7 @@ import {TokenVotingSetup} from "../../src/TokenVotingSetup.sol";
 import {TokenVoting} from "../../src/TokenVoting.sol";
 import {GovernanceERC20} from "../../src/erc20/GovernanceERC20.sol";
 import {MajorityVotingBase} from "../../src/base/MajorityVotingBase.sol";
+import {VotingPowerCondition} from "../../src/condition/VotingPowerCondition.sol";
 import {ProxyLib} from "@aragon/osx-commons-contracts/src/utils/deployment/ProxyLib.sol";
 import {IPlugin} from "@aragon/osx-commons-contracts/src/plugin/IPlugin.sol";
 import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
@@ -15,6 +16,7 @@ import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/
 contract SimpleBuilder is TestBase {
     address immutable DAO_BASE = address(new DAO());
     address immutable TOKEN_VOTING_PLUGIN_BASE = address(new TokenVoting());
+    address private constant ANY_ADDR = address(type(uint160).max);
 
     // Parameters to override
     address daoOwner; // Used for testing purposes only
@@ -117,7 +119,10 @@ contract SimpleBuilder is TestBase {
 
     /// @dev Creates a DAO with the given orchestration settings.
     /// @dev The setup is done on block/timestamp 0 and tests should be made on block/timestamp 1 or later.
-    function build() public returns (DAO dao, TokenVoting plugin, IVotesUpgradeable token_) {
+    function build()
+        public
+        returns (DAO dao, TokenVoting plugin, IVotesUpgradeable token_, VotingPowerCondition condition)
+    {
         // Deploy the DAO with `daoOwner` as ROOT
         dao = DAO(
             payable(
@@ -168,6 +173,12 @@ contract SimpleBuilder is TestBase {
         );
 
         vm.startPrank(daoOwner);
+
+        if (minProposerVotingPower > 0) {
+            // Allow anyone with enough balance to create proposals
+            condition = new VotingPowerCondition(address(plugin));
+            dao.grantWithCondition(address(plugin), ANY_ADDR, plugin.CREATE_PROPOSAL_PERMISSION_ID(), condition);
+        }
 
         // Allow the plugin to execute on the DAO
         dao.grant(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID());

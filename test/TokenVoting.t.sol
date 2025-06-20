@@ -10,6 +10,7 @@ import {TokenVoting} from "../src/TokenVoting.sol";
 import {MajorityVotingBase, IProposal} from "../src/base/MajorityVotingBase.sol";
 import {Action} from "@aragon/osx-commons-contracts/src/executors/IExecutor.sol";
 import {IMajorityVoting} from "../src/base/IMajorityVoting.sol";
+import {VotingPowerCondition} from "../src/condition/VotingPowerCondition.sol";
 import {IPlugin} from "@aragon/osx-commons-contracts/src/plugin/IPlugin.sol";
 import {PluginUUPSUpgradeable} from "@aragon/osx-commons-contracts/src/plugin/PluginUUPSUpgradeable.sol";
 import {IProtocolVersion} from "@aragon/osx-commons-contracts/src/utils/versioning/IProtocolVersion.sol";
@@ -28,14 +29,16 @@ contract TokenVotingTest is TestBase {
     uint64 constant ONE_HOUR = 3600;
     uint64 constant ONE_DAY = 24 * ONE_HOUR;
     uint256 constant RATIO_BASE = 1_000_000;
+    uint256 constant PID_1 = 24442852706930026813960589198787161940723350201292828222811205541589223307271;
 
     DAO dao;
     TokenVoting plugin;
     IVotesUpgradeable token;
+    VotingPowerCondition condition;
 
     modifier givenInTheInitializeContext() {
         // Setup shared across initialize tests
-        (dao, plugin, token) = new SimpleBuilder().withDaoOwner(alice).build();
+        (dao, plugin, token,) = new SimpleBuilder().build();
         _;
     }
 
@@ -63,7 +66,7 @@ contract TokenVotingTest is TestBase {
     function test_WhenCallingInitializeOnAnUninitializedPlugin() external givenInTheInitializeContext {
         // GIVEN an uninitialized plugin proxy
         address base = address(new TokenVoting());
-        (dao,,) = new SimpleBuilder().withDaoOwner(alice).withNewToken(new address[](0), new uint256[](0)).build();
+        (dao,,,) = new SimpleBuilder().withNewToken(new address[](0), new uint256[](0)).build();
         token = plugin.getVotingToken();
 
         address proxy = ProxyLib.deployUUPSProxy(base, "");
@@ -98,7 +101,7 @@ contract TokenVotingTest is TestBase {
     }
 
     modifier givenInTheERC165Context() {
-        (dao, plugin,) = new SimpleBuilder().build();
+        (dao, plugin,,) = new SimpleBuilder().build();
         _;
     }
 
@@ -172,7 +175,7 @@ contract TokenVotingTest is TestBase {
         address[] memory holders = new address[](1);
         holders[0] = alice;
 
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).withNewToken(holders, 1 ether).build();
+        (dao, plugin,,) = new SimpleBuilder().withNewToken(holders, 1 ether).build();
         token = plugin.getVotingToken();
         _;
     }
@@ -193,7 +196,7 @@ contract TokenVotingTest is TestBase {
     modifier givenInTheIProposalInterfaceFunctionContextForProposalCreation() {
         address[] memory holders = new address[](1);
         holders[0] = alice;
-        (dao, plugin,) = new SimpleBuilder().withEarlyExecution().withSupportThreshold(0).withMinParticipation(0)
+        (dao, plugin,,) = new SimpleBuilder().withEarlyExecution().withSupportThreshold(0).withMinParticipation(0)
             .withMinProposerVotingPower(0).withNewToken(holders, 1 ether).build();
 
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
@@ -259,9 +262,7 @@ contract TokenVotingTest is TestBase {
         address[] memory holders = new address[](1);
         holders[0] = alice;
 
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).withMinProposerVotingPower(0).withNewToken(
-            holders, 10 ether
-        ).build();
+        (dao, plugin,,) = new SimpleBuilder().withMinProposerVotingPower(0).withNewToken(holders, 10 ether).build();
         token = plugin.getVotingToken();
         dao.grant(address(plugin), carol, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
@@ -286,13 +287,9 @@ contract TokenVotingTest is TestBase {
         holders[0] = alice;
         holders[1] = bob;
 
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).withMinProposerVotingPower(5 ether).withNewToken(
-            holders, 10 ether
-        ).build();
+        (dao, plugin,,) =
+            new SimpleBuilder().withMinProposerVotingPower(5 ether).withNewToken(holders, 10 ether).build();
         token = plugin.getVotingToken();
-        dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
-        dao.grant(address(plugin), bob, plugin.CREATE_PROPOSAL_PERMISSION_ID());
-        dao.grant(address(plugin), carol, plugin.CREATE_PROPOSAL_PERMISSION_ID());
         _;
     }
 
@@ -303,7 +300,11 @@ contract TokenVotingTest is TestBase {
     {
         // It reverts if `_msgSender` owns no tokens and has no tokens delegated to her/him in the current block
         vm.prank(carol);
-        vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.ProposalCreationForbidden.selector, carol));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DaoUnauthorized.selector, address(dao), address(plugin), carol, plugin.CREATE_PROPOSAL_PERMISSION_ID()
+            )
+        );
         _createDummyProposal(carol);
     }
 
@@ -318,9 +319,17 @@ contract TokenVotingTest is TestBase {
         vm.prank(alice);
         GovernanceERC20(address(token)).transfer(david, 10 ether);
 
-        vm.prank(alice);
+        assertEq(GovernanceERC20(address(token)).balanceOf(alice), 0);
+        assertEq(token.getVotes(alice), 0);
+
         // But not in the current block where the proposal is created
-        vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.ProposalCreationForbidden.selector, alice));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DaoUnauthorized.selector, address(dao), address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID()
+            )
+        );
+        vm.prank(alice);
         plugin.createProposal("0x", new Action[](0), 0, 0, 0, IMajorityVoting.VoteOption.None, false);
     }
 
@@ -367,30 +376,33 @@ contract TokenVotingTest is TestBase {
         address[] memory holders = new address[](1);
         holders[0] = carol;
 
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).withMinProposerVotingPower(10 ether).withNewToken(
-            holders, 5 ether
-        ).build();
-        dao.grant(address(plugin), carol, plugin.CREATE_PROPOSAL_PERMISSION_ID());
+        (dao, plugin,,) =
+            new SimpleBuilder().withMinProposerVotingPower(10 ether).withNewToken(holders, 5 ether).build();
 
         // It reverts if `_msgSender` does not own enough tokens herself/himself and has not tokens delegated to her/him in the current block
-        vm.prank(carol);
-        vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.ProposalCreationForbidden.selector, carol));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DaoUnauthorized.selector, address(dao), address(plugin), carol, plugin.CREATE_PROPOSAL_PERMISSION_ID()
+            )
+        );
         _createDummyProposal(carol);
     }
 
     function test_WhenTheTotalTokenSupplyIs0() external givenInTheProposalCreationContext {
         // It reverts if the total token supply is 0
-        (dao, plugin,) =
-            new SimpleBuilder().withDaoOwner(alice).withNewToken(new address[](0), new uint256[](0)).build();
+        address[] memory holders = new address[](1);
+        holders[0] = alice;
+        uint256[] memory balances = new uint256[](1);
+
+        (dao, plugin,,) = new SimpleBuilder().withNewToken(holders, balances).build();
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
-        vm.prank(alice);
-        vm.expectRevert(bytes("TokenVoting: Total supply is 0"));
+        vm.expectRevert(TokenVoting.NoVotingPower.selector);
         _createDummyProposal(alice);
     }
 
     function test_WhenTheStartDateIsSmallerThanTheCurrentDate() external givenInTheProposalCreationContext {
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).build();
+        (dao, plugin,,) = new SimpleBuilder().build();
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
         // It reverts if the start date is set smaller than the current date
@@ -406,7 +418,7 @@ contract TokenVotingTest is TestBase {
         external
         givenInTheProposalCreationContext
     {
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).build();
+        (dao, plugin,,) = new SimpleBuilder().build();
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
         // It panics if the start date is after the latest start date
@@ -417,25 +429,25 @@ contract TokenVotingTest is TestBase {
     }
 
     function test_WhenTheEndDateIsBeforeTheMinimumDuration() external givenInTheProposalCreationContext {
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).build();
+        (dao, plugin,,) = new SimpleBuilder().build();
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
         // It reverts if the end date is before the earliest end date so that min duration cannot be met
         uint64 startDate = uint64(block.timestamp + ONE_HOUR);
         uint64 invalidEndDate = startDate + uint64(plugin.minDuration() - 1);
-        vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
                 MajorityVotingBase.DateOutOfBounds.selector, startDate + plugin.minDuration(), invalidEndDate
             )
         );
+        vm.prank(alice);
         plugin.createProposal(
             "0x", new Action[](0), 0, startDate, invalidEndDate, IMajorityVoting.VoteOption.None, false
         );
     }
 
     function test_WhenTheStartAndEndDatesAreProvidedAsZero() external givenInTheProposalCreationContext {
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).build();
+        (dao, plugin,,) = new SimpleBuilder().build();
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
         // It sets the startDate to now and endDate to startDate + minDuration, if zeros are provided as an inputs
@@ -448,19 +460,15 @@ contract TokenVotingTest is TestBase {
 
     function test_WhenMinParticipationCalculationResultsInARemainder() external givenInTheProposalCreationContext {
         // It ceils the `minVotingPower` value if it has a remainder
-        address[] memory holders = new address[](4);
+        address[] memory holders = new address[](1);
         holders[0] = alice;
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).withMinParticipation(333_333).withNewToken(
-            holders, 1 ether
-        ) // 1/3
-            .build();
+        (dao, plugin,,) = new SimpleBuilder().withMinParticipation(300_001).withNewToken(holders, 10).build();
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
         uint256 proposalId = _createDummyProposal(alice);
         (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
 
-        // minVotingPower = ceil(4 ether * 333333 / 1000000) = ceil(1.333332 ether) = 1333332000000000001
-        assertEq(params.minVotingPower, 1_333_332_000_000_000_001);
+        assertEq(params.minVotingPower, 4);
     }
 
     function test_WhenMinParticipationCalculationDoesNotResultInARemainder()
@@ -468,22 +476,20 @@ contract TokenVotingTest is TestBase {
         givenInTheProposalCreationContext
     {
         // It does not ceil the `minVotingPower` value if it has no remainder
-        address[] memory holders = new address[](4);
+        address[] memory holders = new address[](1);
         holders[0] = alice;
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).withMinParticipation(250_000).withNewToken(
-            holders, 1 ether
-        ) // 1/4
+        (dao, plugin,,) = new SimpleBuilder().withMinParticipation(250_000).withNewToken(holders, 1 ether) // 1/4
             .build();
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
         uint256 proposalId = _createDummyProposal(alice);
         (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
 
-        assertEq(params.minVotingPower, 1 ether);
+        assertEq(params.minVotingPower, 0.25 ether);
     }
 
     function test_WhenCreatingAProposalWithVoteOptionNone() external givenInTheProposalCreationContext {
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).build();
+        (dao, plugin,,) = new SimpleBuilder().build();
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
         // It should create a proposal successfully, but not vote
@@ -501,13 +507,13 @@ contract TokenVotingTest is TestBase {
         address[] memory holders = new address[](1);
         holders[0] = alice;
 
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).withNewToken(holders, 1 ether).build();
+        (dao, plugin,,) = new SimpleBuilder().withNewToken(holders, 1 ether).build();
         token = plugin.getVotingToken();
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
         // It should create a vote and cast a vote immediately
         vm.expectEmit(true, true, true, true, address(plugin));
-        emit IMajorityVoting.VoteCast(1, alice, IMajorityVoting.VoteOption.Yes, 1 ether);
+        emit IMajorityVoting.VoteCast(PID_1, alice, IMajorityVoting.VoteOption.Yes, 1 ether);
 
         vm.prank(alice);
         uint256 proposalId =
@@ -519,14 +525,14 @@ contract TokenVotingTest is TestBase {
     }
 
     function test_WhenCreatingAProposalWithAVoteOptionBeforeItsStartDate() external givenInTheProposalCreationContext {
-        (dao, plugin,) = new SimpleBuilder().withDaoOwner(alice).build();
+        (dao, plugin,,) = new SimpleBuilder().build();
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
         // It reverts creation when voting before the start date
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, 1, alice, IMajorityVoting.VoteOption.Yes
+                MajorityVotingBase.VoteCastForbidden.selector, PID_1, alice, IMajorityVoting.VoteOption.Yes
             )
         );
         plugin.createProposal(

@@ -21,6 +21,8 @@ contract TestBase is Test {
         vm.label(carol, "Carol");
         vm.label(david, "David");
         vm.label(randomAddress, "Random wallet");
+
+        vm.chainId(11155111);
     }
 
     /// @notice Returns the address and private key associated to the given name.
