@@ -556,13 +556,13 @@ contract TokenVotingTest is TestBase {
         _;
     }
 
-    function test_revert_WhenInteractingWithANonexistentProposal() external givenInTheStandardVotingMode {
+    function test_WhenInteractingWithANonexistentProposal() external givenInTheStandardVotingMode {
         // It reverts if proposal does not exist
         vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.NonexistentProposal.selector, 999));
         plugin.canExecute(999);
     }
 
-    function test_revert_WhenVotingBeforeTheProposalHasStarted() external givenInTheStandardVotingMode {
+    function test_WhenVotingBeforeTheProposalHasStarted() external givenInTheStandardVotingMode {
         // It does not allow voting, when the vote has not started yet
         uint64 futureDate = uint64(block.timestamp + 1 days);
         uint256 proposalId =
@@ -577,7 +577,7 @@ contract TokenVotingTest is TestBase {
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
     }
 
-    function test_revert_WhenAUserWith0TokensTriesToVote() external givenInTheStandardVotingMode {
+    function test_WhenAUserWith0TokensTriesToVote() external givenInTheStandardVotingMode {
         // It should not be able to vote if user has 0 token
         uint256 proposalId = _createDummyProposal(vm.addr(100));
 
@@ -616,7 +616,7 @@ contract TokenVotingTest is TestBase {
         assertEq(tally.abstain, bal);
     }
 
-    function test_revert_WhenAUserTriesToVoteWithVoteOptionNone() external givenInTheStandardVotingMode {
+    function test_WhenAUserTriesToVoteWithVoteOptionNone() external givenInTheStandardVotingMode {
         // It reverts on voting None
         uint256 proposalId = _createDummyProposal(vm.addr(100));
         vm.prank(vm.addr(101));
@@ -628,7 +628,7 @@ contract TokenVotingTest is TestBase {
         plugin.vote(proposalId, IMajorityVoting.VoteOption.None, false);
     }
 
-    function test_revert_WhenAUserTriesToReplaceTheirExistingVote() external givenInTheStandardVotingMode {
+    function test_WhenAUserTriesToReplaceTheirExistingVote() external givenInTheStandardVotingMode {
         // It reverts on vote replacement
         uint256 proposalId = _createDummyProposal(vm.addr(100));
         vm.prank(vm.addr(101));
@@ -695,14 +695,14 @@ contract TokenVotingTest is TestBase {
         assertFalse(executed);
     }
 
-    function test_revert_WhenTryingToExecuteAProposalThatIsNotYetDecided() external givenInTheStandardVotingMode {
+    function test_WhenTryingToExecuteAProposalThatIsNotYetDecided() external givenInTheStandardVotingMode {
         // It reverts if vote is not decided yet
         uint256 proposalId = _createDummyProposal(vm.addr(100));
         vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.ProposalExecutionForbidden.selector, proposalId));
         plugin.execute(proposalId);
     }
 
-    function test_revert_WhenTheCallerDoesNotHaveEXECUTEPROPOSALPERMISSIONID() external givenInTheStandardVotingMode {
+    function test_WhenTheCallerDoesNotHaveEXECUTEPROPOSALPERMISSIONID() external givenInTheStandardVotingMode {
         // It can not execute even if participation and support are met when caller does not have permission
         uint256 proposalId = _createDummyProposal(vm.addr(100));
         vm.prank(vm.addr(101));
