@@ -29,7 +29,7 @@ contract TokenVotingTest is TestBase {
     // Convenience aliases
     uint64 constant ONE_HOUR = 3600;
     uint64 constant ONE_DAY = 24 * ONE_HOUR;
-    uint256 constant RATIO_BASE = 1_000_000;
+    uint32 constant RATIO_BASE = 1_000_000;
     uint256 constant PID_1 = 24442852706930026813960589198787161940723350201292828222811205541589223307271;
     bytes32 public constant SET_TARGET_CONFIG_PERMISSION_ID = keccak256("SET_TARGET_CONFIG_PERMISSION");
 
@@ -37,6 +37,8 @@ contract TokenVotingTest is TestBase {
     TokenVoting plugin;
     IVotesUpgradeable token;
     VotingPowerCondition condition;
+
+    SimpleBuilder builder;
 
     modifier givenInTheInitializeContext() {
         // Setup shared across initialize tests
@@ -1116,6 +1118,20 @@ contract TokenVotingTest is TestBase {
     }
 
     modifier givenASimpleMajorityVoteWith50Support25ParticipationRequiredAndMinimalApproval21() {
+        address[] memory holders = new address[](10);
+        for (uint256 i = 0; i < 10; i++) {
+            holders[i] = vm.addr(100 + i);
+        }
+        uint256 balance = 10 ether;
+
+        (dao, plugin,,) = new SimpleBuilder().withEarlyExecution().withSupportThreshold(500_000).withMinParticipation(
+            250_000
+        ).withMinApprovals(210_000).withNewToken(holders, balance).build();
+
+        dao.grant(address(plugin), address(this), plugin.CREATE_PROPOSAL_PERMISSION_ID());
+        dao.grant(address(plugin), vm.addr(100), plugin.CREATE_PROPOSAL_PERMISSION_ID());
+        dao.grant(address(plugin), address(this), plugin.EXECUTE_PROPOSAL_PERMISSION_ID());
+
         _;
     }
 
@@ -1124,7 +1140,17 @@ contract TokenVotingTest is TestBase {
         givenASimpleMajorityVoteWith50Support25ParticipationRequiredAndMinimalApproval21
     {
         // It does not execute if support is high enough but participation is too low
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+
+        // Yes: 20 (2 voters), No: 0. Total: 20. Participation: 20% < 25%.
+        vm.prank(vm.addr(101));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        vm.prank(vm.addr(102));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+
+        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        vm.warp(params.endDate);
+        assertFalse(plugin.canExecute(proposalId));
     }
 
     function test_WhenSupportAndParticipationAreHighButMinimalApprovalIsTooLow()
@@ -1132,7 +1158,19 @@ contract TokenVotingTest is TestBase {
         givenASimpleMajorityVoteWith50Support25ParticipationRequiredAndMinimalApproval21
     {
         // It does not execute if support and participation are high enough but minimal approval is too low
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        // Yes: 20 (2 voters), No: 10 (1 voter). Total: 30. Participation: 30% >= 25%.
+        // Support: 66% > 50%. Min Approval: 20% < 21%.
+        vm.prank(vm.addr(101));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        vm.prank(vm.addr(102));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        vm.prank(vm.addr(103));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
+
+        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        vm.warp(params.endDate);
+        assertFalse(plugin.canExecute(proposalId));
     }
 
     function test_WhenParticipationIsHighButSupportIsTooLow()
@@ -1140,7 +1178,19 @@ contract TokenVotingTest is TestBase {
         givenASimpleMajorityVoteWith50Support25ParticipationRequiredAndMinimalApproval21
     {
         // It does not execute if participation is high enough but support is too low
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        // Yes: 10 (1 voter), No: 20 (2 voters). Total: 30. Participation: 30% >= 25%.
+        // Support: 33% < 50%.
+        vm.prank(vm.addr(101));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        vm.prank(vm.addr(102));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
+        vm.prank(vm.addr(103));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
+
+        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        vm.warp(params.endDate);
+        assertFalse(plugin.canExecute(proposalId));
     }
 
     function test_WhenParticipationAndMinimalApprovalAreHighButSupportIsTooLow()
@@ -1148,7 +1198,20 @@ contract TokenVotingTest is TestBase {
         givenASimpleMajorityVoteWith50Support25ParticipationRequiredAndMinimalApproval21
     {
         // It does not execute if participation and minimal approval are high enough but support is too low
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        // Yes: 30 (3 voters), No: 40 (4 voters). Total: 70. Participation: 70% >= 25%.
+        // Min Approval: 30% >= 21%. Support: 42% < 50%.
+        for (uint256 i = 1; i <= 3; i++) {
+            vm.prank(vm.addr(100 + i));
+            plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        }
+        for (uint256 i = 4; i <= 7; i++) {
+            vm.prank(vm.addr(100 + i));
+            plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
+        }
+        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        vm.warp(params.endDate);
+        assertFalse(plugin.canExecute(proposalId));
     }
 
     function test_WhenAllThresholdsParticipationSupportMinimalApprovalAreMetAfterTheDuration()
@@ -1156,7 +1219,19 @@ contract TokenVotingTest is TestBase {
         givenASimpleMajorityVoteWith50Support25ParticipationRequiredAndMinimalApproval21
     {
         // It executes after the duration if participation, support and minimal approval are met
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        // Yes: 30 (3 voters), No: 10 (1 voter). Total: 40. Part: 40%>=25%, Supp: 75%>50%, MinApp: 30%>=21%.
+        for (uint256 i = 1; i <= 3; i++) {
+            vm.prank(vm.addr(100 + i));
+            plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        }
+        vm.prank(vm.addr(104));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
+        assertFalse(plugin.canExecute(proposalId));
+
+        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        vm.warp(params.endDate);
+        assertTrue(plugin.canExecute(proposalId));
     }
 
     function test_WhenAllThresholdsAreMetAndTheOutcomeCannotChange()
@@ -1164,7 +1239,16 @@ contract TokenVotingTest is TestBase {
         givenASimpleMajorityVoteWith50Support25ParticipationRequiredAndMinimalApproval21
     {
         // It executes early if participation, support and minimal approval are met and the vote outcome cannot change anymore
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        // Yes: 70 (7 voters), No: 0. Total: 70.
+        // Part: 70%, Supp: 100%, MinApp: 70%. All met.
+        // Early Exec: yes / (total - abstain) = 70 / (100 - 0) = 70%.
+        // (1-0.5)*70 > 0.5 * (100 - 70) => 35 > 15. True.
+        for (uint256 i = 1; i <= 7; i++) {
+            vm.prank(vm.addr(100 + i));
+            plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        }
+        assertTrue(plugin.canExecute(proposalId));
     }
 
     modifier givenAnEdgeCaseWithSupportThreshold0MinParticipation0MinApproval0InEarlyExecutionMode() {
