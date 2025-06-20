@@ -12,6 +12,7 @@ import {Action} from "@aragon/osx-commons-contracts/src/executors/IExecutor.sol"
 import {IMajorityVoting} from "../src/base/IMajorityVoting.sol";
 import {VotingPowerCondition} from "../src/condition/VotingPowerCondition.sol";
 import {IPlugin} from "@aragon/osx-commons-contracts/src/plugin/IPlugin.sol";
+import {Executor} from "@aragon/osx-commons-contracts/src/executors/Executor.sol";
 import {PluginUUPSUpgradeable} from "@aragon/osx-commons-contracts/src/plugin/PluginUUPSUpgradeable.sol";
 import {IProtocolVersion} from "@aragon/osx-commons-contracts/src/utils/versioning/IProtocolVersion.sol";
 import {IMembership} from "@aragon/osx-commons-contracts/src/plugin/extensions/membership/IMembership.sol";
@@ -30,6 +31,7 @@ contract TokenVotingTest is TestBase {
     uint64 constant ONE_DAY = 24 * ONE_HOUR;
     uint256 constant RATIO_BASE = 1_000_000;
     uint256 constant PID_1 = 24442852706930026813960589198787161940723350201292828222811205541589223307271;
+    bytes32 public constant SET_TARGET_CONFIG_PERMISSION_ID = keccak256("SET_TARGET_CONFIG_PERMISSION");
 
     DAO dao;
     TokenVoting plugin;
@@ -727,37 +729,109 @@ contract TokenVotingTest is TestBase {
     }
 
     modifier givenInTheEarlyExecutionVotingMode() {
+        address[] memory holders = new address[](10);
+        for (uint256 i = 0; i < 10; i++) {
+            holders[i] = vm.addr(100 + i);
+        }
+        uint256 balance = 10 ether;
+
+        (dao, plugin,,) = new SimpleBuilder().withEarlyExecution().withSupportThreshold(500_000).withMinParticipation(
+            200_000
+        ).withNewToken(holders, balance).build();
+        token = plugin.getVotingToken();
+
+        dao.grant(address(plugin), address(this), plugin.CREATE_PROPOSAL_PERMISSION_ID());
+        dao.grant(address(plugin), vm.addr(100), plugin.CREATE_PROPOSAL_PERMISSION_ID());
+        dao.grant(address(plugin), address(this), plugin.EXECUTE_PROPOSAL_PERMISSION_ID());
+
         _;
     }
 
-    function test_WhenInteractingWithANonexistentProposal2() external givenInTheEarlyExecutionVotingMode {
+    function test_revert_WhenInteractingWithANonexistentProposal2() external givenInTheEarlyExecutionVotingMode {
         // It reverts if proposal does not exist
-        vm.skip(true);
+        vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.NonexistentProposal.selector, 999));
+        plugin.hasSucceeded(999);
     }
 
-    function test_WhenVotingBeforeTheProposalHasStarted2() external givenInTheEarlyExecutionVotingMode {
+    function test_revert_WhenVotingBeforeTheProposalHasStarted2() external givenInTheEarlyExecutionVotingMode {
         // It does not allow voting, when the vote has not started yet
-        vm.skip(true);
+        uint64 futureDate = uint64(block.timestamp + 1 days);
+        uint256 proposalId =
+            plugin.createProposal("0x", new Action[](0), 0, futureDate, 0, IMajorityVoting.VoteOption.None, false);
+
+        vm.prank(vm.addr(100));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                MajorityVotingBase.VoteCastForbidden.selector, proposalId, vm.addr(100), IMajorityVoting.VoteOption.Yes
+            )
+        );
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
     }
 
-    function test_WhenAUserWith0TokensTriesToVote2() external givenInTheEarlyExecutionVotingMode {
+    function test_revert_WhenAUserWith0TokensTriesToVote2() external givenInTheEarlyExecutionVotingMode {
         // It should not be able to vote if user has 0 token
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+
+        vm.prank(david); // David has 0 tokens
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                MajorityVotingBase.VoteCastForbidden.selector, proposalId, david, IMajorityVoting.VoteOption.Yes
+            )
+        );
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
     }
 
     function test_WhenMultipleUsersVoteYesNoAndAbstain2() external givenInTheEarlyExecutionVotingMode {
         // It increases the yes, no, and abstain count and emits correct events
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        uint256 bal = 10 ether;
+
+        vm.prank(vm.addr(101));
+        vm.expectEmit(true, true, true, true);
+        emit IMajorityVoting.VoteCast(proposalId, vm.addr(101), IMajorityVoting.VoteOption.Yes, bal);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+
+        vm.prank(vm.addr(102));
+        vm.expectEmit(true, true, true, true);
+        emit IMajorityVoting.VoteCast(proposalId, vm.addr(102), IMajorityVoting.VoteOption.No, bal);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
+
+        vm.prank(vm.addr(103));
+        vm.expectEmit(true, true, true, true);
+        emit IMajorityVoting.VoteCast(proposalId, vm.addr(103), IMajorityVoting.VoteOption.Abstain, bal);
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Abstain, false);
+
+        (,,, MajorityVotingBase.Tally memory tally,,,) = plugin.getProposal(proposalId);
+        assertEq(tally.yes, bal);
+        assertEq(tally.no, bal);
+        assertEq(tally.abstain, bal);
     }
 
-    function test_WhenAUserTriesToVoteWithVoteOptionNone2() external givenInTheEarlyExecutionVotingMode {
+    function test_revert_WhenAUserTriesToVoteWithVoteOptionNone2() external givenInTheEarlyExecutionVotingMode {
         // It reverts on voting None
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        vm.prank(vm.addr(101));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                MajorityVotingBase.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.None
+            )
+        );
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.None, false);
     }
 
-    function test_WhenAUserTriesToReplaceTheirExistingVote2() external givenInTheEarlyExecutionVotingMode {
+    function test_revert_WhenAUserTriesToReplaceTheirExistingVote2() external givenInTheEarlyExecutionVotingMode {
         // It reverts on vote replacement
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        vm.prank(vm.addr(101));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+
+        vm.prank(vm.addr(101));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                MajorityVotingBase.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.No
+            )
+        );
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
     }
 
     function test_WhenParticipationIsLargeEnoughToMakeTheOutcomeUnchangeable()
@@ -765,7 +839,20 @@ contract TokenVotingTest is TestBase {
         givenInTheEarlyExecutionVotingMode
     {
         // It can execute early if participation is large enough
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+
+        // 6/10 vote yes. totalVotingPower = 100. yes = 60.
+        // worst case no = 40. 60 > 40. Support threshold reached early.
+        // Participation is 60%, > 20%.
+        for (uint256 i = 1; i <= 6; i++) {
+            vm.prank(vm.addr(100 + i));
+            plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        }
+
+        assertTrue(plugin.canExecute(proposalId));
+        plugin.execute(proposalId);
+        (, bool executed,,,,,) = plugin.getProposal(proposalId);
+        assertTrue(executed);
     }
 
     function test_WhenParticipationAndSupportAreMetAfterTheVotingPeriodEnds()
@@ -773,17 +860,54 @@ contract TokenVotingTest is TestBase {
         givenInTheEarlyExecutionVotingMode
     {
         // It can execute normally if participation is large enough
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        // 2 yes, 1 no -> participation met (30%), support met (66%)
+        vm.prank(vm.addr(101));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        vm.prank(vm.addr(102));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        vm.prank(vm.addr(103));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
+
+        assertFalse(plugin.canExecute(proposalId));
+
+        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        vm.warp(params.endDate);
+
+        assertTrue(plugin.canExecute(proposalId));
     }
 
     function test_WhenParticipationIsTooLowEvenIfSupportIsMet() external givenInTheEarlyExecutionVotingMode {
         // It cannot execute normally if participation is too low
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        // 1 yes -> support 100%, but participation 10% < 20%
+        vm.prank(vm.addr(101));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+
+        assertFalse(plugin.canExecute(proposalId));
+        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        vm.warp(params.endDate);
+        assertFalse(plugin.canExecute(proposalId));
     }
 
     function test_WhenTheTargetOperationIsADelegatecall() external givenInTheEarlyExecutionVotingMode {
         // It executes target with delegate call
-        vm.skip(true);
+        Executor target = new Executor();
+        dao.grant(address(plugin), address(this), SET_TARGET_CONFIG_PERMISSION_ID);
+        plugin.setTargetConfig(
+            IPlugin.TargetConfig({target: address(target), operation: IPlugin.Operation.DelegateCall})
+        );
+
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        for (uint256 i = 1; i <= 6; i++) {
+            vm.prank(vm.addr(100 + i));
+            plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        }
+
+        assertTrue(plugin.canExecute(proposalId));
+        vm.expectEmit(true, false, false, true);
+        emit IProposal.ProposalExecuted(proposalId);
+        plugin.execute(proposalId);
     }
 
     function test_WhenTheVoteIsDecidedEarlyAndTheTryEarlyExecutionOptionIsUsed()
@@ -791,12 +915,32 @@ contract TokenVotingTest is TestBase {
         givenInTheEarlyExecutionVotingMode
     {
         // It executes the vote immediately when the vote is decided early and the tryEarlyExecution options is selected
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        for (uint256 i = 1; i <= 5; i++) {
+            vm.prank(vm.addr(100 + i));
+            plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        }
+        assertFalse(plugin.canExecute(proposalId));
+
+        dao.grant(address(plugin), vm.addr(106), plugin.EXECUTE_PROPOSAL_PERMISSION_ID());
+
+        vm.expectEmit(true, true, true, true);
+        emit IProposal.ProposalExecuted(proposalId);
+        vm.prank(vm.addr(106));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, true);
+
+        (, bool executed,,,,,) = plugin.getProposal(proposalId);
+        assertTrue(executed);
     }
 
-    function test_WhenTryingToExecuteAProposalThatIsNotYetDecided2() external givenInTheEarlyExecutionVotingMode {
+    function test_revert_WhenTryingToExecuteAProposalThatIsNotYetDecided2()
+        external
+        givenInTheEarlyExecutionVotingMode
+    {
         // It reverts if vote is not decided yet
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.ProposalExecutionForbidden.selector, proposalId));
+        plugin.execute(proposalId);
     }
 
     function test_WhenTheCallerHasNoExecutionPermissionButTryEarlyExecutionIsSelected()
@@ -804,7 +948,20 @@ contract TokenVotingTest is TestBase {
         givenInTheEarlyExecutionVotingMode
     {
         // It record vote correctly without executing even when tryEarlyExecution options is selected
-        vm.skip(true);
+        uint256 proposalId = _createDummyProposal(vm.addr(100));
+        for (uint256 i = 1; i <= 5; i++) {
+            vm.prank(vm.addr(100 + i));
+            plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
+        }
+
+        vm.prank(vm.addr(106));
+        plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, true);
+
+        (,,, MajorityVotingBase.Tally memory tally,,,) = plugin.getProposal(proposalId);
+        assertEq(tally.yes, 60 ether);
+
+        (, bool executed,,,,,) = plugin.getProposal(proposalId);
+        assertFalse(executed, "Should not execute without permission");
     }
 
     modifier givenInTheVoteReplacementVotingMode() {
