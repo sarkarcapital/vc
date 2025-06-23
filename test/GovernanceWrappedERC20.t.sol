@@ -1,107 +1,191 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {TestBase} from "./lib/TestBase.sol";
+import {GovernanceWrappedERC20} from "../src/erc20/GovernanceWrappedERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {IERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/IERC165Upgradeable.sol";
+import {IGovernanceWrappedERC20} from "../src/erc20/IGovernanceWrappedERC20.sol";
+import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {IERC20PermitUpgradeable} from
+    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20PermitUpgradeable.sol";
+import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
+import {IERC20MetadataUpgradeable} from
+    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import {ERC20Mock} from "./mocks/ERC20Mock.sol";
 
-contract GovernanceWrappedERC20Test is Test {
+contract GovernanceWrappedERC20Test is TestBase {
+    event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
+
+    string internal constant UNDERLYING_TOKEN_NAME = "Token";
+    string internal constant UNDERLYING_TOKEN_SYMBOL = "TOK";
+    string internal constant WRAPPED_TOKEN_NAME = "GovernanceWrappedToken";
+    string internal constant WRAPPED_TOKEN_SYMBOL = "gwTOK";
+
+    ERC20Mock internal underlyingToken;
+    GovernanceWrappedERC20 internal governanceToken;
+
+    address internal from;
+    address internal to;
+    address internal other;
+    address internal toDelegate;
+
+    function setUp() public virtual {
+        underlyingToken = new ERC20Mock(UNDERLYING_TOKEN_NAME, UNDERLYING_TOKEN_SYMBOL);
+        governanceToken = new GovernanceWrappedERC20(
+            IERC20Upgradeable(address(underlyingToken)), WRAPPED_TOKEN_NAME, WRAPPED_TOKEN_SYMBOL
+        );
+
+        // Assign actors for exhaustive tests
+        from = alice;
+        to = bob;
+        other = carol;
+    }
+
     modifier givenTheContractIsAlreadyInitialized() {
         _;
     }
 
     function test_WhenCallingInitializeAgain() external givenTheContractIsAlreadyInitialized {
         // It reverts if trying to re-initialize
-        vm.skip(true);
+        vm.expectRevert("Initializable: contract is already initialized");
+        governanceToken.initialize(IERC20Upgradeable(address(underlyingToken)), "another name", "another symbol");
     }
 
-    function test_WhenCheckingTheContractsNameAndSymbol() external givenTheContractIsAlreadyInitialized {
-        // It sets the wrapped token name and symbol
-        vm.skip(true);
+    function test_WhenCheckingTheContractsNameAndSymbol() external view givenTheContractIsAlreadyInitialized {
+        assertEq(governanceToken.name(), WRAPPED_TOKEN_NAME);
+        assertEq(governanceToken.symbol(), WRAPPED_TOKEN_SYMBOL);
     }
 
-    function test_WhenCheckingTheContractsDecimalsWithoutModification() external givenTheContractIsAlreadyInitialized {
+    function test_WhenCheckingTheContractsDecimalsWithoutModification()
+        external
+        view
+        givenTheContractIsAlreadyInitialized
+    {
         // It should return default decimals if not modified
-        vm.skip(true);
+        assertEq(governanceToken.decimals(), 18);
     }
 
     function test_WhenCheckingTheContractsDecimalsAfterModification() external givenTheContractIsAlreadyInitialized {
         // It should return modified decimals
-        vm.skip(true);
+        underlyingToken.setDecimals(8);
+        assertEq(governanceToken.decimals(), 8);
     }
 
     modifier givenTheContractIsDeployed() {
         _;
     }
 
-    function test_WhenCallingSupportsInterfaceWithTheEmptyInterface() external givenTheContractIsDeployed {
+    function test_WhenCallingSupportsInterfaceWithTheEmptyInterface() external view givenTheContractIsDeployed {
         // It does not support the empty interface
-        vm.skip(true);
+        assertFalse(governanceToken.supportsInterface(bytes4(0xffffffff)));
     }
 
     function test_WhenCallingSupportsInterfaceWithTheIERC165UpgradeableInterface()
         external
+        view
         givenTheContractIsDeployed
     {
         // It supports the `IERC165Upgradeable` interface
-        vm.skip(true);
+        assertTrue(governanceToken.supportsInterface(type(IERC165Upgradeable).interfaceId));
     }
 
     function test_WhenCallingSupportsInterfaceWithTheIGovernanceWrappedERC20Interface()
         external
+        view
         givenTheContractIsDeployed
     {
         // It supports the `IGovernanceWrappedERC20` interface
-        vm.skip(true);
+        assertTrue(governanceToken.supportsInterface(type(IGovernanceWrappedERC20).interfaceId));
     }
 
-    function test_WhenCallingSupportsInterfaceWithTheIERC20UpgradeableInterface() external givenTheContractIsDeployed {
+    function test_WhenCallingSupportsInterfaceWithTheIERC20UpgradeableInterface()
+        external
+        view
+        givenTheContractIsDeployed
+    {
         // It supports the `IERC20Upgradeable` interface
-        vm.skip(true);
+        assertTrue(governanceToken.supportsInterface(type(IERC20Upgradeable).interfaceId));
     }
 
     function test_WhenCallingSupportsInterfaceWithTheIERC20PermitUpgradeableInterface()
         external
+        view
         givenTheContractIsDeployed
     {
         // It supports the `IERC20PermitUpgradeable` interface
-        vm.skip(true);
+        assertTrue(governanceToken.supportsInterface(type(IERC20PermitUpgradeable).interfaceId));
     }
 
-    function test_WhenCallingSupportsInterfaceWithTheIVotesUpgradeableInterface() external givenTheContractIsDeployed {
+    function test_WhenCallingSupportsInterfaceWithTheIVotesUpgradeableInterface()
+        external
+        view
+        givenTheContractIsDeployed
+    {
         // It supports the `IVotesUpgradeable` interface
-        vm.skip(true);
+        assertTrue(governanceToken.supportsInterface(type(IVotesUpgradeable).interfaceId));
     }
 
     function test_WhenCallingSupportsInterfaceWithTheIERC20MetadataUpgradeableInterface()
         external
+        view
         givenTheContractIsDeployed
     {
         // It supports the `IERC20MetadataUpgradeable` interface
-        vm.skip(true);
+        assertTrue(governanceToken.supportsInterface(type(IERC20MetadataUpgradeable).interfaceId));
     }
 
     modifier givenTheContractIsDeployed2() {
+        // setUp() deploys the contract
         _;
     }
 
     modifier givenTheDepositAmountIsNotApproved() {
+        uint256 amount = 100 ether;
+        underlyingToken.mint(alice, amount);
+        // No approval is given
         _;
     }
 
     function test_WhenCallingDepositFor() external givenTheContractIsDeployed2 givenTheDepositAmountIsNotApproved {
         // It reverts if the amount is not approved
-        vm.skip(true);
+        vm.expectRevert("ERC20: insufficient allowance");
+        governanceToken.depositFor(alice, 100 ether);
+
+        vm.expectRevert("ERC20: insufficient allowance");
+        governanceToken.depositFor(alice, 20 ether);
+
+        vm.expectRevert("ERC20: insufficient allowance");
+        governanceToken.depositFor(alice, 1 ether);
     }
 
     modifier givenTheDepositAmountIsApproved() {
+        uint256 amount = 100 ether;
+        underlyingToken.mint(alice, amount);
+        vm.prank(alice);
+        underlyingToken.approve(address(governanceToken), amount);
         _;
     }
 
     function test_WhenCallingDepositFor2() external givenTheContractIsDeployed2 givenTheDepositAmountIsApproved {
         // It deposits an amount of tokens
-        vm.skip(true);
+        uint256 amount = 100 ether;
+        uint256 aliceUnderlyingBefore = underlyingToken.balanceOf(alice);
+        uint256 aliceWrappedBefore = governanceToken.balanceOf(alice);
+
+        vm.prank(alice);
+        governanceToken.depositFor(alice, amount);
+
+        assertEq(underlyingToken.balanceOf(alice), aliceUnderlyingBefore - amount);
+        assertEq(governanceToken.balanceOf(alice), aliceWrappedBefore + amount);
     }
 
     modifier givenTheFullBalanceIsApprovedForDeposit() {
+        uint256 amount = 123 ether;
+        underlyingToken.mint(alice, amount);
+        vm.prank(alice);
+        underlyingToken.approve(address(governanceToken), amount);
         _;
     }
 
@@ -111,44 +195,122 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheFullBalanceIsApprovedForDeposit
     {
         // It updates the available votes
-        vm.skip(true);
+        uint256 amount = 123 ether;
+        vm.prank(alice);
+        governanceToken.depositFor(alice, amount);
+        assertEq(governanceToken.getVotes(alice), amount);
     }
 
     modifier givenTokensHaveBeenDeposited() {
+        uint256 amount = 123 ether;
+        underlyingToken.mint(alice, amount);
+        vm.prank(alice);
+        underlyingToken.approve(address(governanceToken), amount);
+        vm.prank(alice);
+        governanceToken.depositFor(alice, amount);
         _;
     }
 
     function test_WhenCallingWithdrawTo() external givenTokensHaveBeenDeposited {
         // It withdraws an amount of tokens
-        vm.skip(true);
+        uint256 withdrawAmount = 100 ether;
+        uint256 aliceUnderlyingBefore = underlyingToken.balanceOf(alice);
+        uint256 aliceWrappedBefore = governanceToken.balanceOf(alice);
+
+        vm.prank(alice);
+        governanceToken.withdrawTo(alice, withdrawAmount);
+
+        assertEq(underlyingToken.balanceOf(alice), aliceUnderlyingBefore + withdrawAmount);
+        assertEq(governanceToken.balanceOf(alice), aliceWrappedBefore - withdrawAmount);
     }
 
     function test_WhenCallingWithdrawToForTheFullBalance() external givenTokensHaveBeenDeposited {
         // It updates the available votes
-        vm.skip(true);
+        uint256 fullBalance = governanceToken.balanceOf(alice);
+        vm.prank(alice);
+        governanceToken.withdrawTo(alice, fullBalance);
+        assertEq(governanceToken.balanceOf(alice), 0);
+        assertEq(governanceToken.getVotes(alice), 0);
     }
 
     modifier givenTokensHaveBeenDepositedAndApprovedForAllHolders() {
+        underlyingToken.mint(alice, 100 ether);
+        underlyingToken.mint(bob, 200 ether);
+        underlyingToken.mint(carol, 300 ether);
+
+        vm.startPrank(alice);
+        underlyingToken.approve(address(governanceToken), 100 ether);
+        governanceToken.depositFor(alice, 100 ether);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        underlyingToken.approve(address(governanceToken), 200 ether);
+        governanceToken.depositFor(bob, 200 ether);
+        vm.stopPrank();
+
+        vm.startPrank(carol);
+        underlyingToken.approve(address(governanceToken), 300 ether);
+        governanceToken.depositFor(carol, 300 ether);
+        vm.stopPrank();
         _;
     }
 
     function test_WhenCallingDelegate() external givenTokensHaveBeenDepositedAndApprovedForAllHolders {
         // It delegates voting power to another account
-        vm.skip(true);
+        uint256 aliceVotes = governanceToken.getVotes(alice);
+        uint256 bobVotes = governanceToken.getVotes(bob);
+
+        vm.prank(alice);
+        governanceToken.delegate(bob);
+
+        assertEq(governanceToken.delegates(alice), bob);
+        assertEq(governanceToken.getVotes(alice), 0);
+        assertEq(governanceToken.getVotes(bob), aliceVotes + bobVotes);
     }
 
     function test_WhenCallingDelegateMultipleTimes() external givenTokensHaveBeenDepositedAndApprovedForAllHolders {
         // It is checkpointed
-        vm.skip(true);
+        vm.prank(alice);
+        governanceToken.delegate(bob);
+
+        uint256 blockNumBefore = block.number;
+        vm.roll(block.number + 1);
+
+        vm.prank(alice);
+        governanceToken.delegate(carol);
+
+        // Check past votes
+        assertEq(governanceToken.getPastVotes(alice, blockNumBefore), 0);
+        assertEq(governanceToken.getPastVotes(bob, blockNumBefore), 100 ether + 200 ether);
+        assertEq(governanceToken.getPastVotes(carol, blockNumBefore), 300 ether);
+
+        // Check current votes
+        assertEq(governanceToken.getVotes(alice), 0);
+        assertEq(governanceToken.getVotes(bob), 200 ether);
+        assertEq(governanceToken.getVotes(carol), 100 ether + 300 ether);
     }
 
     modifier givenAFreshTokenContractIsDeployedAndBalancesAreSet() {
+        underlyingToken.mint(alice, 200 ether);
+        underlyingToken.mint(bob, 200 ether);
+        vm.prank(alice);
+        underlyingToken.approve(address(governanceToken), 200 ether);
+        vm.prank(bob);
+        underlyingToken.approve(address(governanceToken), 200 ether);
         _;
     }
 
     function test_WhenMintingTokensForAUser() external givenAFreshTokenContractIsDeployedAndBalancesAreSet {
         // It turns on delegation after mint
-        vm.skip(true);
+        assertEq(governanceToken.delegates(alice), address(0));
+
+        vm.expectEmit(true, true, true, true);
+        emit DelegateChanged(alice, address(0), alice);
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 1 ether);
+
+        assertEq(governanceToken.delegates(alice), alice);
+        assertEq(governanceToken.getVotes(alice), 1 ether);
     }
 
     function test_WhenTransferringTokensToAUserForTheFirstTime()
@@ -156,7 +318,18 @@ contract GovernanceWrappedERC20Test is Test {
         givenAFreshTokenContractIsDeployedAndBalancesAreSet
     {
         // It turns on delegation for the `to` address after transfer
-        vm.skip(true);
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 100 ether); // Alice gets auto-delegation
+
+        assertEq(governanceToken.delegates(bob), address(0));
+
+        vm.expectEmit(true, true, true, true);
+        emit DelegateChanged(bob, address(0), bob);
+        vm.prank(alice);
+        governanceToken.transfer(bob, 50 ether);
+
+        assertEq(governanceToken.delegates(bob), bob);
+        assertEq(governanceToken.getVotes(bob), 50 ether);
     }
 
     function test_WhenTransferringTokensThroughAChainOfUsers()
@@ -164,10 +337,27 @@ contract GovernanceWrappedERC20Test is Test {
         givenAFreshTokenContractIsDeployedAndBalancesAreSet
     {
         // It turns on delegation for all users in the chain of transfer A => B => C
-        vm.skip(true);
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 100 ether);
+
+        vm.prank(alice);
+        governanceToken.transfer(bob, 40 ether);
+
+        vm.prank(bob);
+        governanceToken.transfer(carol, 20 ether);
+
+        assertEq(governanceToken.getVotes(alice), 60 ether);
+        assertEq(governanceToken.getVotes(bob), 20 ether);
+        assertEq(governanceToken.getVotes(carol), 20 ether);
     }
 
     modifier givenTheRecipientHasManuallyTurnedDelegationOff() {
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 100 ether);
+        vm.prank(alice);
+        governanceToken.transfer(bob, 50 ether); // Turns on delegation for Bob
+        vm.prank(bob);
+        governanceToken.delegate(address(0)); // Bob turns it off
         _;
     }
 
@@ -177,19 +367,30 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheRecipientHasManuallyTurnedDelegationOff
     {
         // It should not turn on delegation on `transfer` if `to` manually turned it off
-        vm.skip(true);
+        vm.prank(alice);
+        governanceToken.transfer(bob, 50 ether);
+
+        assertEq(governanceToken.delegates(bob), address(0));
+        assertEq(governanceToken.getVotes(bob), 0);
     }
 
-    function test_WhenMintingTokensForTheRecipient()
-        external
-        givenAFreshTokenContractIsDeployedAndBalancesAreSet
-        givenTheRecipientHasManuallyTurnedDelegationOff
-    {
+    function test_WhenMintingTokensForTheRecipient() external givenAFreshTokenContractIsDeployedAndBalancesAreSet {
         // It should not turn on delegation on `mint` if `to` manually turned it off
-        vm.skip(true);
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 100 ether);
+        vm.prank(alice);
+        governanceToken.delegate(address(0)); // Alice turns it off
+
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 50 ether);
+
+        assertEq(governanceToken.delegates(alice), address(0));
+        assertEq(governanceToken.getVotes(alice), 0);
     }
 
     modifier givenTheUserHasSetADelegateBeforeReceivingTokens() {
+        vm.prank(bob);
+        governanceToken.delegate(carol);
         _;
     }
 
@@ -199,7 +400,13 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheUserHasSetADelegateBeforeReceivingTokens
     {
         // It should not rewrite delegation setting for `transfer` if user set it on before receiving tokens
-        vm.skip(true);
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 10 ether);
+
+        vm.prank(alice);
+        governanceToken.transfer(bob, 10 ether);
+
+        assertEq(governanceToken.delegates(bob), carol);
     }
 
     function test_WhenMintingTokensForTheUser()
@@ -208,10 +415,14 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheUserHasSetADelegateBeforeReceivingTokens
     {
         // It should not rewrite delegation setting for `mint` if user set it on before receiving tokens
-        vm.skip(true);
+        vm.prank(bob);
+        governanceToken.depositFor(bob, 10 ether);
+        assertEq(governanceToken.delegates(bob), carol);
     }
 
     modifier givenDelegationWasTurnedOnInThePast() {
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 100 ether);
         _;
     }
 
@@ -221,7 +432,9 @@ contract GovernanceWrappedERC20Test is Test {
         givenDelegationWasTurnedOnInThePast
     {
         // It should not turn on delegation on `mint` if it was turned on at least once in the past
-        vm.skip(true);
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 100 ether);
+        assertEq(governanceToken.getVotes(alice), 200 ether);
     }
 
     function test_WhenTransferringTokens()
@@ -230,10 +443,17 @@ contract GovernanceWrappedERC20Test is Test {
         givenDelegationWasTurnedOnInThePast
     {
         // It should not turn on delegation on `transfer` if it was turned on at least once in the past
-        vm.skip(true);
+        vm.prank(alice);
+        governanceToken.transfer(bob, 50 ether); // First transfer to bob
+
+        vm.prank(alice);
+        governanceToken.transfer(bob, 30 ether); // Second transfer to bob
+        assertEq(governanceToken.getVotes(bob), 80 ether);
     }
 
     modifier givenDelegationIsTurnedOnForTheSender() {
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 100 ether);
         _;
     }
 
@@ -243,10 +463,16 @@ contract GovernanceWrappedERC20Test is Test {
         givenDelegationIsTurnedOnForTheSender
     {
         // It updates voting power after transfer for `from` if delegation turned on
-        vm.skip(true);
+        vm.prank(alice);
+        governanceToken.transfer(bob, 30 ether);
+        assertEq(governanceToken.getVotes(alice), 70 ether);
     }
 
     modifier givenDelegationIsTurnedOnForTheRecipient() {
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 100 ether);
+        vm.prank(alice);
+        governanceToken.transfer(bob, 30 ether);
         _;
     }
 
@@ -256,18 +482,34 @@ contract GovernanceWrappedERC20Test is Test {
         givenDelegationIsTurnedOnForTheRecipient
     {
         // It updates voting power after transfer for `to` if delegation turned on
-        vm.skip(true);
+        assertEq(governanceToken.getVotes(bob), 30 ether);
     }
 
     modifier givenAnExhaustiveTestSetupForTokenTransfers() {
+        underlyingToken.mint(from, 200 ether);
+        vm.prank(from);
+        underlyingToken.approve(address(governanceToken), 200 ether);
+
+        underlyingToken.mint(to, 200 ether);
+        vm.prank(to);
+        underlyingToken.approve(address(governanceToken), 200 ether);
+
+        underlyingToken.mint(other, 200 ether);
+        vm.prank(other);
+        underlyingToken.approve(address(governanceToken), 200 ether);
         _;
     }
 
     modifier givenTheToAddressHasAZeroBalance() {
+        assertEq(governanceToken.balanceOf(to), 0);
+        toDelegate = address(0);
         _;
     }
 
     modifier givenTheToAddressHasDelegatedToOther() {
+        vm.prank(to);
+        governanceToken.delegate(other);
+        toDelegate = other;
         _;
     }
 
@@ -277,10 +519,12 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasAZeroBalance
         givenTheToAddressHasDelegatedToOther
     {
-        // It `to` has the correct voting power
-        // It `to`s delegate has not changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.prank(to);
+        governanceToken.depositFor(to, 100 ether);
+
+        assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), toDelegate, "`to` delegate has changed");
+        assertEq(governanceToken.getVotes(toDelegate), 100 ether, "`to`s delegate has incorrect voting power");
     }
 
     function test_WhenToReceivesTokensViaTransferFromFrom()
@@ -289,13 +533,18 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasAZeroBalance
         givenTheToAddressHasDelegatedToOther
     {
-        // It `from` has the correct voting power
-        // It `from`s delegate has not changed
-        // It `from`s delegate has the correct voting power
-        // It `to` has the correct voting power
-        // It `to`s delegate has not changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.prank(from);
+        governanceToken.depositFor(from, 100 ether);
+
+        vm.prank(from);
+        governanceToken.transfer(to, 100 ether);
+
+        assertEq(governanceToken.getVotes(from), 0, "`from` has incorrect voting power");
+        assertEq(governanceToken.delegates(from), from, "`from`s delegate has changed");
+        assertEq(governanceToken.getVotes(governanceToken.delegates(from)), 0, "`from`s delegate has incorrect power");
+        assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), toDelegate, "`to`s delegate has changed");
+        assertEq(governanceToken.getVotes(toDelegate), 100 ether, "`to`s delegate has incorrect voting power");
     }
 
     modifier givenTheToAddressHasNotDelegatedBefore() {
@@ -308,10 +557,15 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasAZeroBalance
         givenTheToAddressHasNotDelegatedBefore
     {
-        // It `to` has the correct voting power
-        // It `to`s delegate has not changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.expectEmit(true, true, true, true);
+        emit DelegateChanged(to, address(0), to);
+        vm.prank(to);
+        governanceToken.depositFor(to, 100 ether);
+        toDelegate = to;
+
+        assertEq(governanceToken.getVotes(to), 100 ether, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), toDelegate, "`to`s delegate has changed");
+        assertEq(governanceToken.getVotes(toDelegate), 100 ether, "`to`s delegate has incorrect voting power");
     }
 
     function test_WhenToReceivesTokensViaTransferFromFrom2()
@@ -320,24 +574,44 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasAZeroBalance
         givenTheToAddressHasNotDelegatedBefore
     {
-        // It `from` has the correct voting power
-        // It `from`s delegate has not changed
-        // It `from`s delegate has the correct voting power
-        // It `to` has the correct voting power
-        // It `to`s delegate has not changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.prank(from);
+        governanceToken.depositFor(from, 100 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit DelegateChanged(to, address(0), to);
+        vm.prank(from);
+        governanceToken.transfer(to, 100 ether);
+        toDelegate = to;
+
+        assertEq(governanceToken.getVotes(from), 0, "`from` has incorrect voting power");
+        assertEq(governanceToken.delegates(from), from, "`from`s delegate has changed");
+        assertEq(governanceToken.getVotes(governanceToken.delegates(from)), 0, "`from`s delegate has incorrect power");
+        assertEq(governanceToken.getVotes(to), 100 ether, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), toDelegate, "`to`s delegate has changed");
+        assertEq(governanceToken.getVotes(toDelegate), 100 ether, "`to`s delegate has incorrect voting power");
     }
 
     modifier givenTheToAddressHasANonzeroBalance() {
+        vm.prank(to);
+        governanceToken.depositFor(to, 100 ether);
+        toDelegate = to;
+        assertEq(governanceToken.balanceOf(to), 100 ether);
         _;
     }
 
     modifier givenTheToAddressHasDelegatedToOther2() {
+        vm.prank(to);
+        governanceToken.delegate(other);
+        toDelegate = other;
         _;
     }
 
     modifier whenToReceivesMoreTokensViaDepositFor() {
+        vm.prank(to);
+        governanceToken.depositFor(to, 100 ether);
+        assertEq(governanceToken.getVotes(to), 0);
+        assertEq(governanceToken.delegates(to), toDelegate);
+        assertEq(governanceToken.getVotes(toDelegate), 200 ether);
         _;
     }
 
@@ -348,10 +622,12 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasDelegatedToOther2
         whenToReceivesMoreTokensViaDepositFor
     {
-        // It `to` has the correct voting power
-        // It `to`s delegate has not changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.prank(to);
+        governanceToken.transfer(other, 100 ether);
+
+        assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), toDelegate, "`to`s delegate has changed");
+        assertEq(governanceToken.getVotes(toDelegate), 100 ether, "`to`s delegate has incorrect voting power");
     }
 
     function test_WhenToThenRedelegatesToOther()
@@ -361,13 +637,26 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasDelegatedToOther2
         whenToReceivesMoreTokensViaDepositFor
     {
-        // It `to` has the correct voting power
-        // It `to`s delegate is correctly changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.prank(to);
+        governanceToken.delegate(other);
+
+        assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), other, "`to`s delegate is incorrect");
+        assertEq(governanceToken.getVotes(toDelegate), 200 ether, "`to`s delegate has incorrect voting power");
     }
 
     modifier whenToReceivesMoreTokensViaTransferFromFrom() {
+        vm.prank(from);
+        governanceToken.depositFor(from, 100 ether);
+        vm.prank(from);
+        governanceToken.transfer(to, 100 ether);
+
+        assertEq(governanceToken.getVotes(from), 0);
+        assertEq(governanceToken.delegates(from), from);
+        assertEq(governanceToken.getVotes(governanceToken.delegates(from)), 0);
+        assertEq(governanceToken.getVotes(to), 0);
+        assertEq(governanceToken.delegates(to), other);
+        assertEq(governanceToken.getVotes(toDelegate), 200 ether);
         _;
     }
 
@@ -378,10 +667,12 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasDelegatedToOther2
         whenToReceivesMoreTokensViaTransferFromFrom
     {
-        // It `to` has the correct voting power
-        // It `to`s delegate has not changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.prank(to);
+        governanceToken.transfer(other, 100 ether);
+
+        assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), toDelegate, "`to`s delegate has changed");
+        assertEq(governanceToken.getVotes(toDelegate), 100 ether, "`to`s delegate has incorrect voting power");
     }
 
     function test_WhenToThenRedelegatesToOther2()
@@ -391,17 +682,26 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasDelegatedToOther2
         whenToReceivesMoreTokensViaTransferFromFrom
     {
-        // It `to` has the correct voting power
-        // It `to`s delegate is correctly changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.prank(to);
+        governanceToken.delegate(other);
+
+        assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), other, "`to`s delegate is incorrect");
+        assertEq(governanceToken.getVotes(toDelegate), 200 ether, "`to`s delegate has incorrect voting power");
     }
 
     modifier givenTheToAddressHasNotDelegatedBeforeReceivingAnInitialBalance() {
+        // This is the state set by givenTheToAddressHasANonzeroBalance
         _;
     }
 
     modifier whenToReceivesMoreTokensViaDepositFor2() {
+        vm.prank(to);
+        governanceToken.depositFor(to, 100 ether);
+
+        assertEq(governanceToken.getVotes(to), 200 ether);
+        assertEq(governanceToken.delegates(to), toDelegate);
+        assertEq(governanceToken.getVotes(toDelegate), 200 ether);
         _;
     }
 
@@ -412,10 +712,12 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasNotDelegatedBeforeReceivingAnInitialBalance
         whenToReceivesMoreTokensViaDepositFor2
     {
-        // It `to` has the correct voting power
-        // It `to`s delegate has not changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.prank(to);
+        governanceToken.transfer(other, 100 ether);
+
+        assertEq(governanceToken.getVotes(to), 100 ether, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), toDelegate, "`to`s delegate has changed");
+        assertEq(governanceToken.getVotes(toDelegate), 100 ether, "`to`s delegate has incorrect voting power");
     }
 
     function test_WhenToThenDelegatesToOther()
@@ -425,13 +727,27 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasNotDelegatedBeforeReceivingAnInitialBalance
         whenToReceivesMoreTokensViaDepositFor2
     {
-        // It `to` has the correct voting power
-        // It `to`s delegate is correctly changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.prank(to);
+        governanceToken.delegate(other);
+        toDelegate = other;
+
+        assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), other, "`to`s delegate is incorrect");
+        assertEq(governanceToken.getVotes(toDelegate), 200 ether, "`to`s delegate has incorrect voting power");
     }
 
     modifier whenToReceivesMoreTokensViaTransferFromFrom2() {
+        vm.prank(from);
+        governanceToken.depositFor(from, 100 ether);
+        vm.prank(from);
+        governanceToken.transfer(to, 100 ether);
+
+        assertEq(governanceToken.getVotes(from), 0);
+        assertEq(governanceToken.delegates(from), from);
+        assertEq(governanceToken.getVotes(governanceToken.delegates(from)), 0);
+        assertEq(governanceToken.getVotes(to), 200 ether);
+        assertEq(governanceToken.delegates(to), toDelegate);
+        assertEq(governanceToken.getVotes(toDelegate), 200 ether);
         _;
     }
 
@@ -442,10 +758,12 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasNotDelegatedBeforeReceivingAnInitialBalance
         whenToReceivesMoreTokensViaTransferFromFrom2
     {
-        // It `to` has the correct voting power
-        // It `to`s delegate has not changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.prank(to);
+        governanceToken.transfer(other, 100 ether);
+
+        assertEq(governanceToken.getVotes(to), 100 ether, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), toDelegate, "`to`s delegate has changed");
+        assertEq(governanceToken.getVotes(toDelegate), 100 ether, "`to`s delegate has incorrect voting power");
     }
 
     function test_WhenToThenDelegatesToOther2()
@@ -455,9 +773,12 @@ contract GovernanceWrappedERC20Test is Test {
         givenTheToAddressHasNotDelegatedBeforeReceivingAnInitialBalance
         whenToReceivesMoreTokensViaTransferFromFrom2
     {
-        // It `to` has the correct voting power
-        // It `to`s delegate is correctly changed
-        // It `to`s delegate has the correct voting power
-        vm.skip(true);
+        vm.prank(to);
+        governanceToken.delegate(other);
+        toDelegate = other;
+
+        assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), other, "`to`s delegate is incorrect");
+        assertEq(governanceToken.getVotes(toDelegate), 200 ether, "`to`s delegate has incorrect voting power");
     }
 }

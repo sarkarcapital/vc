@@ -221,7 +221,6 @@ contract GovernanceERC20Test is TestBase {
 
         vm.prank(alice);
         token.delegate(carol);
-        uint256 block2 = block.number;
 
         // Check current votes
         assertEq(token.getVotes(alice), 0);
