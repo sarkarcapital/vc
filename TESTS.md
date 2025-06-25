@@ -564,17 +564,25 @@ TokenVotingSetup
 UpgradingTest
 ├── When Upgrading to a new implementation
 │   └── It upgrades to a new implementation
-├── Given The contract is at v100
+├── Given The contract is at R1 B1
 │   └── When Upgrading with initializeFrom
-│       ├── It Upgrades from v1.0.0 with `initializeFrom`
+│       ├── It Upgrades from R1 B1 with `initializeFrom`
 │       ├── It The old `initialize` function fails during the upgrade
 │       ├── It initializeFrom succeeds
 │       ├── It protocol versions are updated correctly
 │       ├── It new settings are applied
 │       └── It the original `initialize` function is disabled post-upgrade
-└── Given The contract is at v130
-    └── When Upgrading with initializeFrom 2
-        ├── It upgrades from v1.3.0 with `initializeFrom`
+├── Given The contract is at R1 B2
+│   └── When Upgrading with initializeFrom 2
+│       ├── It upgrades from R1 B2 with `initializeFrom`
+│       ├── It The old `initialize` function fails during the upgrade
+│       ├── It initializeFrom succeeds
+│       ├── It protocol versions are updated correctly
+│       ├── It new settings are applied
+│       └── It the original `initialize` function is disabled post-upgrade
+└── Given The contract is at R1 B3
+    └── When Upgrading with initializeFrom 3
+        ├── It upgrades from R1 B3 with `initializeFrom`
         ├── It The old `initialize` function fails during the upgrade
         ├── It initializeFrom succeeds
         ├── It protocol versions are updated correctly
