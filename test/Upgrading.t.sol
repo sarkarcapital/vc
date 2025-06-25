@@ -234,4 +234,78 @@ contract UpgradingTest is Test {
             token
         );
     }
+
+    // modifier givenTheContractIsAtR1B3() {
+    //     _;
+    // }
+
+    // function test_WhenUpgradingWithInitializeFrom3() external givenTheContractIsAtR1B3 {
+    //     // It upgrades from R1 B3 with `initializeFrom`
+    //     (DAO dao,, IVotesUpgradeable token,) = new SimpleBuilder().build();
+
+    //     // Install as 1.3
+    //     TokenVotingR1B3 plugin = TokenVotingR1B3(
+    //         ProxyLib.deployUUPSProxy(
+    //             address(new TokenVotingR1B3()),
+    //             abi.encodeCall(
+    //                 TokenVotingR1B3.initialize,
+    //                 (
+    //                     dao,
+    //                     MajorityVotingBaseR1B3.VotingSettings({
+    //                         votingMode: MajorityVotingBaseR1B3.VotingMode.EarlyExecution,
+    //                         supportThreshold: 123_456,
+    //                         minParticipation: 234_567,
+    //                         minDuration: 60 * 60,
+    //                         minProposerVotingPower: 11223344556677889900
+    //                     }),
+    //                     token,
+    //                     IPlugin.TargetConfig({target: address(dao), operation: IPlugin.Operation.Call}),
+    //                     112233, // minApprovals
+    //                     "some-meta"
+    //                 )
+    //             )
+    //         )
+    //     );
+
+    //     dao.grant(address(plugin), address(this), keccak256("UPGRADE_PLUGIN_PERMISSION"));
+
+    //     address originalImpl = address(plugin.implementation());
+
+    //     // It The old `initialize` function fails during the upgrade
+    //     vm.expectRevert(AlreadyInitialized.selector);
+    //     plugin.upgradeToAndCall(
+    //         originalImpl,
+    //         abi.encodeCall(
+    //             TokenVotingR1B3.initialize,
+    //             (
+    //                 dao,
+    //                 MajorityVotingBaseR1B3.VotingSettings({
+    //                     votingMode: MajorityVotingBaseR1B3.VotingMode.EarlyExecution,
+    //                     supportThreshold: 123_456,
+    //                     minParticipation: 234_567,
+    //                     minDuration: 60 * 60,
+    //                     minProposerVotingPower: 11223344556677889900
+    //                 }),
+    //                 token,
+    //                 IPlugin.TargetConfig({target: address(dao), operation: IPlugin.Operation.Call}),
+    //                 112233, // minApprovals
+    //                 "some-meta"
+    //             )
+    //         )
+    //     );
+
+    //     // address newImpl = address(new TokenVoting());
+
+    //     // It initializeFrom succeeds
+    //     // plugin.upgradeToAndCall(newImpl, abi.encodeCall(TokenVoting.initializeFrom, (3, abi.encode())));
+
+    //     // address currentImpl = address(plugin.implementation());
+    //     // assertNotEq(originalImpl, currentImpl);
+    //     // assertEq(currentImpl, newImpl);
+
+    //     // It protocol version remains
+    //     // It new settings are applied
+    //     // It the original `initialize` function is disabled post-upgrade
+    //     vm.skip(true);
+    // }
 }

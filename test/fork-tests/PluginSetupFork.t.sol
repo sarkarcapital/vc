@@ -37,12 +37,31 @@ import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/
 
 contract PluginSetupForkTest is ForkTestBase {
     // An address of the official TokenVoting plugin repository on Sepolia
-    // This allows testing updates from previously published builds
-    // https://sepolia.etherscan.io/address/0x481633515A23374251a84497e335222f5a435A91
-    address private constant TOKEN_VOTING_REPO_ADDRESS = 0x481633515a23374251A84497e335222F5A435a91;
+    address private constant TOKEN_VOTING_REPO_ADDRESS = 0x424F4cA6FA9c24C03f2396DF0E96057eD11CF7dF;
+
+    DAO internal dao;
+    TokenVoting internal plugin;
+    PluginRepo internal repo;
+    TokenVotingSetup internal setup;
 
     // Actors
     address private deployer = address(this);
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        (dao, repo, setup, plugin) = new ForkBuilder().build();
+    }
+
+    function test_simpleFlow() public view {
+        // Check the Repo
+        PluginRepo.Version memory version = repo.getLatestVersion(repo.latestRelease());
+        assertEq(version.pluginSetup, address(setup));
+        assertEq(version.buildMetadata, NON_EMPTY_BYTES);
+
+        // Check the DAO
+        assertEq(keccak256(bytes(dao.daoURI())), keccak256(bytes("http://host/")));
+    }
 
     modifier givenTheDeployerHasAllNecessaryPermissionsForInstallationAndUninstallation() {
         _;
@@ -54,8 +73,7 @@ contract PluginSetupForkTest is ForkTestBase {
     {
         // It installs & uninstalls the current build with a token
 
-        // SETUP: Create a DAO and an "existing" token for it to use
-        (DAO dao, PluginRepo repo,,) = new ForkBuilder().build();
+        // SETUP with an existing token
         GovernanceERC20 existingToken;
         {
             address[] memory receivers = new address[](1);
@@ -159,9 +177,6 @@ contract PluginSetupForkTest is ForkTestBase {
     {
         // It installs & uninstalls the current build without a token
 
-        // SETUP: Create a DAO
-        (DAO dao, PluginRepo repo,,) = new ForkBuilder().build();
-
         // PERMISSIONS: Grant the necessary permissions
 
         dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
@@ -250,4 +265,131 @@ contract PluginSetupForkTest is ForkTestBase {
             "Plugin should be uninstalled"
         );
     }
+
+    // modifier givenAPreviousPluginBuild1IsInstalledAndTheDeployerHasUpdatePermissions() {
+    //     _;
+    // }
+
+    // function test_WhenUpdatingFromBuild1ToTheCurrentBuild()
+    //     external
+    //     givenAPreviousPluginBuild1IsInstalledAndTheDeployerHasUpdatePermissions
+    // {
+    //     // It updates from build 1 to the current build
+
+    //     // SETUP: Create a DAO
+    //     (DAO dao,,,) = new ForkBuilder().build();
+
+    //     // PERMISSIONS: Grant installation and update permissions
+    //     PluginRepo prodRepo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
+
+    //     dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
+    //     dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_UPDATE_PERMISSION_ID());
+    //     dao.grant(address(dao), address(pluginSetupProcessor), dao.ROOT_PERMISSION_ID());
+
+    //     // INSTALL OLD BUILD (v1.1)
+    //     PluginSetupRef memory oldSetupRef =
+    //         PluginSetupRef({versionTag: PluginRepo.Tag({release: 1, build: 1}), pluginSetupRepo: prodRepo});
+
+    //     // Prepare installation data compatible with build 1
+    //     // Assumes build 1 `prepareInstallation` signature was: (VotingSettings, TokenSettings, MintSettings)
+    //     MajorityVotingBase.VotingSettings memory votingSettings =
+    //         MajorityVotingBase.VotingSettings(MajorityVotingBase.VotingMode.Standard, 500_000, 100_000, 1 hours, 0);
+    //     TokenVotingSetup.TokenSettings memory tokenSettings =
+    //         TokenVotingSetup.TokenSettings({addr: address(0), name: "Old Token", symbol: "OLD"});
+    //     GovernanceERC20.MintSettings memory mintSettings =
+    //         GovernanceERC20.MintSettings(new address[](0), new uint256[](0));
+    //     bytes memory installDataV1 = abi.encode(votingSettings, tokenSettings, mintSettings);
+
+    //     (address plugin, IPluginSetup.PreparedSetupData memory preparedSetupData) =
+    //         pluginSetupProcessor.prepareInstallation(dao, oldSetupRef, installDataV1);
+    //     dao.applyInstallation(plugin, preparedSetupData);
+
+    //     // UPDATE TO LATEST BUILD
+    //     PluginSetupRef memory latestSetupRef =
+    //         PluginSetupRef({versionTag: getLatestTag(prodRepo), pluginSetupRepo: prodRepo});
+
+    //     // Prepare update data for the latest build
+    //     uint256 newMinApprovals = 100_000;
+    //     IPlugin.TargetConfig memory newTargetConfig =
+    //         IPlugin.TargetConfig(makeAddr("newTarget"), IPlugin.Operation.DelegateCall);
+    //     bytes memory newMetadata = "0x22";
+    //     bytes memory updateData = abi.encode(newMinApprovals, newTargetConfig, newMetadata);
+
+    //     // Prepare and apply the update
+    //     (address newImplementation, bytes memory permissionChanges) =
+    //         pluginSetupProcessor.prepareUpdate(plugin, latestSetupRef, updateData);
+    //     dao.applyUpdate(plugin, newImplementation, permissionChanges);
+
+    //     // ASSERTIONS
+    //     TokenVoting tokenVotingPlugin = TokenVoting(plugin);
+    //     assertEq(tokenVotingPlugin.implementation(), newImplementation, "Implementation not updated");
+    //     assertEq(tokenVotingPlugin.minApproval(), newMinApprovals, "minApproval not updated");
+    //     (address targetAddr, IPlugin.Operation op) = tokenVotingPlugin.getTargetConfig();
+    //     assertEq(targetAddr, newTargetConfig.target, "Target address not updated");
+    //     assertEq(uint8(op), uint8(newTargetConfig.operation), "Target operation not updated");
+    // }
+
+    // modifier givenAPreviousPluginBuild2IsInstalledAndTheDeployerHasUpdatePermissions() {
+    //     _;
+    // }
+
+    // function test_WhenUpdatingFromBuild2ToTheCurrentBuild()
+    //     external
+    //     givenAPreviousPluginBuild2IsInstalledAndTheDeployerHasUpdatePermissions
+    // {
+    //     // It updates from build 2 to the current build
+
+    //     // SETUP: Create a DAO
+    //     (DAO dao,,,) = new ForkBuilder().build();
+
+    //     // PERMISSIONS: Grant installation and update permissions
+    //     PluginRepo prodRepo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
+
+    //     dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
+    //     dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_UPDATE_PERMISSION_ID());
+    //     dao.grant(address(dao), address(pluginSetupProcessor), dao.ROOT_PERMISSION_ID());
+
+    //     // INSTALL OLD BUILD (v1.2)
+    //     PluginSetupRef memory oldSetupRef =
+    //         PluginSetupRef({versionTag: PluginRepo.Tag({release: 1, build: 2}), pluginSetupRepo: prodRepo});
+
+    //     // Prepare installation data compatible with build 2
+    //     // Assumes build 2 `prepareInstallation` signature was: (VotingSettings, TokenSettings, MintSettings, TargetConfig)
+    //     MajorityVotingBase.VotingSettings memory votingSettings = MajorityVotingBase.VotingSettings(
+    //         MajorityVotingBase.VotingMode.VoteReplacement, 500_000, 100_000, 1 hours, 0
+    //     );
+    //     TokenVotingSetup.TokenSettings memory tokenSettings =
+    //         TokenVotingSetup.TokenSettings({addr: address(0), name: "Old Token", symbol: "OLD"});
+    //     GovernanceERC20.MintSettings memory mintSettings =
+    //         GovernanceERC20.MintSettings(new address[](0), new uint256[](0));
+    //     IPlugin.TargetConfig memory oldTargetConfig = IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call);
+    //     bytes memory installDataV2 = abi.encode(votingSettings, tokenSettings, mintSettings, oldTargetConfig);
+
+    //     (address plugin, IPluginSetup.PreparedSetupData memory preparedSetupData) =
+    //         pluginSetupProcessor.prepareInstallation(dao, oldSetupRef, installDataV2);
+    //     dao.applyInstallation(plugin, preparedSetupData);
+
+    //     // UPDATE TO LATEST BUILD
+    //     PluginSetupRef memory latestSetupRef =
+    //         PluginSetupRef({versionTag: getLatestTag(prodRepo), pluginSetupRepo: prodRepo});
+
+    //     uint256 newMinApprovals = 123_456;
+    //     IPlugin.TargetConfig memory newTargetConfig =
+    //         IPlugin.TargetConfig(makeAddr("anotherTarget"), IPlugin.Operation.Call);
+    //     bytes memory newMetadata = "0x33";
+    //     bytes memory updateData = abi.encode(newMinApprovals, newTargetConfig, newMetadata);
+
+    //     // Prepare and apply the update
+    //     (address newImplementation, bytes memory permissionChanges) =
+    //         pluginSetupProcessor.prepareUpdate(plugin, latestSetupRef, updateData);
+    //     dao.applyUpdate(plugin, newImplementation, permissionChanges);
+
+    //     // ASSERTIONS
+    //     TokenVoting tokenVotingPlugin = TokenVoting(plugin);
+    //     assertEq(tokenVotingPlugin.implementation(), newImplementation, "Implementation not updated");
+    //     assertEq(tokenVotingPlugin.minApproval(), newMinApprovals, "minApproval not updated");
+    //     (address targetAddr, IPlugin.Operation op) = tokenVotingPlugin.getTargetConfig();
+    //     assertEq(targetAddr, newTargetConfig.target, "Target address not updated");
+    //     assertEq(uint8(op), uint8(newTargetConfig.operation), "Target operation not updated");
+    // }
 }

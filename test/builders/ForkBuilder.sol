@@ -123,12 +123,13 @@ contract ForkBuilder is ForkTestBase {
             new GovernanceWrappedERC20(IERC20Upgradeable(address(0)), "", "");
 
         // Prepare a plugin repo with an initial version and subdomain
-        string memory pluginRepoSubdomain = string.concat("my-token-voting-plugin-", vm.toString(block.timestamp));
+        string memory pluginRepoSubdomain =
+            string.concat("my-token-voting-plugin-", vm.toString(block.timestamp), "-", vm.toString(block.chainid));
         pluginSetup = new TokenVotingSetup(governanceERC20, governanceWrappedERC20);
         pluginRepo = pluginRepoFactory.createPluginRepoWithFirstVersion({
             _subdomain: string(pluginRepoSubdomain),
             _pluginSetup: address(pluginSetup),
-            _maintainer: address(this),
+            _maintainer: msg.sender,
             _releaseMetadata: NON_EMPTY_BYTES,
             _buildMetadata: NON_EMPTY_BYTES
         });
