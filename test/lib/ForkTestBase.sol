@@ -30,6 +30,10 @@ contract ForkTestBase is TestBase {
             revert("Please, set PLUGIN_SETUP_PROCESSOR_ADDRESS on your .env file");
         }
 
+        vm.label(address(daoFactory), "DaoFactory");
+        vm.label(address(pluginRepoFactory), "PluginRepoFactory");
+        vm.label(address(pluginSetupProcessor), "PluginSetupProcessor");
+
         // Start the fork
         vm.createSelectFork(vm.envString("RPC_URL"));
     }

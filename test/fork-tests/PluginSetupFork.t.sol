@@ -10,6 +10,7 @@ import {PluginRepo} from "@aragon/osx/framework/plugin/repo/PluginRepo.sol";
 
 import {TokenVotingSetup} from "../../src/TokenVotingSetup.sol";
 import {TokenVoting} from "../../src/TokenVoting.sol";
+import {IMajorityVoting} from "../../src/base/IMajorityVoting.sol";
 import {NON_EMPTY_BYTES} from "../constants.sol";
 
 import {ForkTestBase} from "../lib/ForkTestBase.sol";
@@ -17,6 +18,8 @@ import {ForkBuilder} from "../builders/ForkBuilder.sol";
 
 // Aragon OSx Contracts
 import {DAO} from "@aragon/osx/core/dao/DAO.sol";
+import {PermissionManager} from "@aragon/osx/core/permission/PermissionManager.sol";
+import {Action} from "@aragon/osx-commons-contracts/src/executors/IExecutor.sol";
 import {PluginRepo} from "@aragon/osx/framework/plugin/repo/PluginRepo.sol";
 import {
     PluginSetupRef,
@@ -40,24 +43,18 @@ contract PluginSetupForkTest is ForkTestBase {
     address private constant TOKEN_VOTING_REPO_ADDRESS = 0x424F4cA6FA9c24C03f2396DF0E96057eD11CF7dF;
 
     DAO internal dao;
-    TokenVoting internal plugin;
-    PluginRepo internal repo;
-    TokenVotingSetup internal setup;
-
-    // Actors
-    address private deployer = address(this);
+    PluginRepo internal repo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
 
     function setUp() public virtual override {
         super.setUp();
 
-        (dao, repo, setup, plugin) = new ForkBuilder().build();
+        dao = new ForkBuilder().build();
     }
 
     function test_simpleFlow() public view {
         // Check the Repo
         PluginRepo.Version memory version = repo.getLatestVersion(repo.latestRelease());
-        assertEq(version.pluginSetup, address(setup));
-        assertEq(version.buildMetadata, NON_EMPTY_BYTES);
+        assertEq(version.buildMetadata, bytes("ipfs://bafkreifsn2562ftambmmfoqa64wfxviu4g47evmcj5ydsjdmmsmqhqrn3i"));
 
         // Check the DAO
         assertEq(keccak256(bytes(dao.daoURI())), keccak256(bytes("http://host/")));
@@ -85,9 +82,10 @@ contract PluginSetupForkTest is ForkTestBase {
         }
 
         // PERMISSIONS: Grant the necessary permissions to the PluginSetupProcessor
-
-        dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
-        dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_UNINSTALLATION_PERMISSION_ID());
+        dao.grant(address(pluginSetupProcessor), address(this), pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
+        dao.grant(
+            address(pluginSetupProcessor), address(this), pluginSetupProcessor.APPLY_UNINSTALLATION_PERMISSION_ID()
+        );
         dao.grant(address(dao), address(pluginSetupProcessor), dao.ROOT_PERMISSION_ID());
 
         PluginSetupRef memory setupRef = PluginSetupRef({versionTag: getLatestTag(repo), pluginSetupRepo: repo});
@@ -110,14 +108,15 @@ contract PluginSetupForkTest is ForkTestBase {
 
         // Prepare and apply the installation
         IPluginSetup.PreparedSetupData memory preparedSetupData;
+        address pluginAddr;
         {
-            address pluginAddr;
             PluginSetupProcessor.PrepareInstallationParams memory prepareInstallParams =
                 PluginSetupProcessor.PrepareInstallationParams({pluginSetupRef: setupRef, data: installData});
 
             (pluginAddr, preparedSetupData) =
                 pluginSetupProcessor.prepareInstallation(address(dao), prepareInstallParams);
-            plugin = TokenVoting(pluginAddr);
+
+            vm.label(pluginAddr, "NewTokenVoting");
 
             PluginSetupProcessor.ApplyInstallationParams memory applyInstallParams = PluginSetupProcessor
                 .ApplyInstallationParams({
@@ -126,17 +125,16 @@ contract PluginSetupForkTest is ForkTestBase {
                 permissions: preparedSetupData.permissions,
                 helpersHash: hashHelpers(preparedSetupData.helpers)
             });
-            pluginSetupProcessor.applyInstallation(pluginAddr, applyInstallParams);
+            pluginSetupProcessor.applyInstallation(address(dao), applyInstallParams);
 
             vm.assertTrue(
-                dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""),
-                "Plugin should be installed"
+                dao.isGranted(address(dao), pluginAddr, dao.EXECUTE_PERMISSION_ID(), ""), "Plugin should be installed"
             );
         }
 
         // Assert that the installation was successful and configured correctly
         {
-            TokenVoting tokenVotingPlugin = TokenVoting(plugin);
+            TokenVoting tokenVotingPlugin = TokenVoting(pluginAddr);
             assertEq(address(tokenVotingPlugin.getVotingToken()), address(existingToken), "Token address mismatch");
             assertTrue(tokenVotingPlugin.isMember(alice), "Alice should be a member");
             assertFalse(tokenVotingPlugin.isMember(bob), "Bob should not be a member");
@@ -149,7 +147,7 @@ contract PluginSetupForkTest is ForkTestBase {
                 .PrepareUninstallationParams({
                 pluginSetupRef: setupRef,
                 setupPayload: IPluginSetup.SetupPayload({
-                    plugin: address(plugin),
+                    plugin: pluginAddr,
                     currentHelpers: preparedSetupData.helpers,
                     data: ""
                 })
@@ -158,18 +156,13 @@ contract PluginSetupForkTest is ForkTestBase {
                 pluginSetupProcessor.prepareUninstallation(address(dao), uninstallParams);
 
             PluginSetupProcessor.ApplyUninstallationParams memory applyUninstallParams = PluginSetupProcessor
-                .ApplyUninstallationParams({
-                plugin: address(plugin),
-                pluginSetupRef: setupRef,
-                permissions: uninstallPermissions
-            });
-            pluginSetupProcessor.applyUninstallation(address(plugin), applyUninstallParams);
+                .ApplyUninstallationParams({plugin: pluginAddr, pluginSetupRef: setupRef, permissions: uninstallPermissions});
+            pluginSetupProcessor.applyUninstallation(address(dao), applyUninstallParams);
         }
 
         // Assert that the plugin was successfully uninstalled
         vm.assertFalse(
-            dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""),
-            "Plugin should be uninstalled"
+            dao.isGranted(address(dao), pluginAddr, dao.EXECUTE_PERMISSION_ID(), ""), "Plugin should be uninstalled"
         );
     }
 
@@ -184,9 +177,10 @@ contract PluginSetupForkTest is ForkTestBase {
         // It installs & uninstalls the current build without a token
 
         // PERMISSIONS: Grant the necessary permissions
-
-        dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
-        dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_UNINSTALLATION_PERMISSION_ID());
+        dao.grant(address(pluginSetupProcessor), address(this), pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
+        dao.grant(
+            address(pluginSetupProcessor), address(this), pluginSetupProcessor.APPLY_UNINSTALLATION_PERMISSION_ID()
+        );
         dao.grant(address(dao), address(pluginSetupProcessor), dao.ROOT_PERMISSION_ID());
 
         PluginSetupRef memory setupRef = PluginSetupRef({versionTag: getLatestTag(repo), pluginSetupRepo: repo});
@@ -213,15 +207,16 @@ contract PluginSetupForkTest is ForkTestBase {
 
         // Prepare and apply the installation
         IPluginSetup.PreparedSetupData memory preparedSetupData;
+        address pluginAddr;
 
         {
-            address pluginAddr;
             PluginSetupProcessor.PrepareInstallationParams memory prepareInstallParams =
                 PluginSetupProcessor.PrepareInstallationParams({pluginSetupRef: setupRef, data: installData});
 
             (pluginAddr, preparedSetupData) =
                 pluginSetupProcessor.prepareInstallation(address(dao), prepareInstallParams);
-            plugin = TokenVoting(pluginAddr);
+
+            vm.label(pluginAddr, "NewTokenVoting");
 
             PluginSetupProcessor.ApplyInstallationParams memory applyInstallParams = PluginSetupProcessor
                 .ApplyInstallationParams({
@@ -230,17 +225,16 @@ contract PluginSetupForkTest is ForkTestBase {
                 permissions: preparedSetupData.permissions,
                 helpersHash: hashHelpers(preparedSetupData.helpers)
             });
-            pluginSetupProcessor.applyInstallation(pluginAddr, applyInstallParams);
+            pluginSetupProcessor.applyInstallation(address(dao), applyInstallParams);
 
             vm.assertTrue(
-                dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""),
-                "Plugin should be installed"
+                dao.isGranted(address(dao), pluginAddr, dao.EXECUTE_PERMISSION_ID(), ""), "Plugin should be installed"
             );
         }
 
         // Assert that the installation created and configured the new token correctly
         {
-            TokenVoting tokenVotingPlugin = TokenVoting(plugin);
+            TokenVoting tokenVotingPlugin = TokenVoting(pluginAddr);
             IVotesUpgradeable newToken = tokenVotingPlugin.getVotingToken();
             assertNotEq(address(newToken), address(0), "New token should have been created");
             assertTrue(tokenVotingPlugin.isMember(alice), "Alice should be a member");
@@ -254,7 +248,7 @@ contract PluginSetupForkTest is ForkTestBase {
                 .PrepareUninstallationParams({
                 pluginSetupRef: setupRef,
                 setupPayload: IPluginSetup.SetupPayload({
-                    plugin: address(plugin),
+                    plugin: pluginAddr,
                     currentHelpers: preparedSetupData.helpers,
                     data: ""
                 })
@@ -263,18 +257,13 @@ contract PluginSetupForkTest is ForkTestBase {
                 pluginSetupProcessor.prepareUninstallation(address(dao), uninstallParams);
 
             PluginSetupProcessor.ApplyUninstallationParams memory applyUninstallParams = PluginSetupProcessor
-                .ApplyUninstallationParams({
-                plugin: address(plugin),
-                pluginSetupRef: setupRef,
-                permissions: uninstallPermissions
-            });
-            pluginSetupProcessor.applyUninstallation(address(plugin), applyUninstallParams);
+                .ApplyUninstallationParams({plugin: pluginAddr, pluginSetupRef: setupRef, permissions: uninstallPermissions});
+            pluginSetupProcessor.applyUninstallation(address(dao), applyUninstallParams);
         }
 
         // Assert that the plugin was successfully uninstalled
         vm.assertFalse(
-            dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""),
-            "Plugin should be uninstalled"
+            dao.isGranted(address(dao), pluginAddr, dao.EXECUTE_PERMISSION_ID(), ""), "Plugin should be uninstalled"
         );
     }
 
@@ -289,18 +278,17 @@ contract PluginSetupForkTest is ForkTestBase {
         // It updates from build 1 to the current build
 
         // SETUP: Create a DAO
-        (dao,,,) = new ForkBuilder().build();
+        dao = new ForkBuilder().build();
 
         // PERMISSIONS: Grant installation and update permissions
-        PluginRepo prodRepo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
+        PluginRepo liveRepo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
 
-        dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
-        dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_UPDATE_PERMISSION_ID());
+        dao.grant(address(pluginSetupProcessor), address(this), pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
         dao.grant(address(dao), address(pluginSetupProcessor), dao.ROOT_PERMISSION_ID());
 
         // INSTALL OLD BUILD (v1.1)
         PluginSetupRef memory oldSetupRef =
-            PluginSetupRef({versionTag: PluginRepo.Tag({release: 1, build: 1}), pluginSetupRepo: prodRepo});
+            PluginSetupRef({versionTag: PluginRepo.Tag({release: 1, build: 1}), pluginSetupRepo: liveRepo});
 
         // Prepare installation data compatible with build 1
         // Assumes build 1 `prepareInstallation` signature was: (VotingSettings, TokenSettings, MintSettings)
@@ -323,14 +311,15 @@ contract PluginSetupForkTest is ForkTestBase {
             initializeFromData = abi.encode(newMinApprovals, newTargetConfig, newMetadata);
         }
 
+        address pluginAddr;
         {
-            address pluginAddr;
             PluginSetupProcessor.PrepareInstallationParams memory prepareInstallParams =
                 PluginSetupProcessor.PrepareInstallationParams({pluginSetupRef: oldSetupRef, data: installDataV1});
 
             (pluginAddr, preparedSetupData) =
                 pluginSetupProcessor.prepareInstallation(address(dao), prepareInstallParams);
-            plugin = TokenVoting(pluginAddr);
+
+            vm.label(pluginAddr, "NewTokenVoting");
 
             PluginSetupProcessor.ApplyInstallationParams memory applyInstallParams = PluginSetupProcessor
                 .ApplyInstallationParams({
@@ -339,16 +328,15 @@ contract PluginSetupForkTest is ForkTestBase {
                 permissions: preparedSetupData.permissions,
                 helpersHash: hashHelpers(preparedSetupData.helpers)
             });
-            pluginSetupProcessor.applyInstallation(pluginAddr, applyInstallParams);
+            pluginSetupProcessor.applyInstallation(address(dao), applyInstallParams);
 
             vm.assertTrue(
-                dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""),
-                "Plugin should be installed"
+                dao.isGranted(address(dao), pluginAddr, dao.EXECUTE_PERMISSION_ID(), ""), "Plugin should be installed"
             );
 
             // UPDATE TO LATEST BUILD
             PluginSetupRef memory latestSetupRef =
-                PluginSetupRef({versionTag: getLatestTag(prodRepo), pluginSetupRepo: prodRepo});
+                PluginSetupRef({versionTag: getLatestTag(liveRepo), pluginSetupRepo: liveRepo});
 
             // Prepare update data for the latest build
 
@@ -358,7 +346,7 @@ contract PluginSetupForkTest is ForkTestBase {
                 newVersionTag: latestSetupRef.versionTag,
                 pluginSetupRepo: repo,
                 setupPayload: IPluginSetup.SetupPayload({
-                    plugin: address(plugin),
+                    plugin: pluginAddr,
                     currentHelpers: preparedSetupData.helpers,
                     data: initializeFromData
                 })
@@ -367,7 +355,7 @@ contract PluginSetupForkTest is ForkTestBase {
             bytes memory initData;
             (initData, preparedSetupData) = pluginSetupProcessor.prepareUpdate(address(dao), updateParams);
             PluginSetupProcessor.ApplyUpdateParams memory applyUpdateParams = PluginSetupProcessor.ApplyUpdateParams({
-                plugin: address(plugin),
+                plugin: pluginAddr,
                 pluginSetupRef: latestSetupRef,
                 initData: initData,
                 permissions: preparedSetupData.permissions,
@@ -378,7 +366,7 @@ contract PluginSetupForkTest is ForkTestBase {
 
         // ASSERTIONS
         {
-            TokenVoting tokenVotingPlugin = TokenVoting(plugin);
+            TokenVoting tokenVotingPlugin = TokenVoting(pluginAddr);
             assertEq(tokenVotingPlugin.implementation(), newImplementation, "Implementation not updated");
             assertEq(tokenVotingPlugin.minApproval(), 100_000, "minApproval not updated");
             assertEq(tokenVotingPlugin.getTargetConfig().target, makeAddr("newTarget"), "Target address not updated");
@@ -401,18 +389,17 @@ contract PluginSetupForkTest is ForkTestBase {
         // It updates from build 2 to the current build
 
         // SETUP: Create a DAO
-        (dao,,,) = new ForkBuilder().build();
+        dao = new ForkBuilder().build();
 
         // PERMISSIONS: Grant installation and update permissions
-        PluginRepo prodRepo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
+        PluginRepo liveRepo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
 
-        dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
-        dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_UPDATE_PERMISSION_ID());
+        dao.grant(address(pluginSetupProcessor), address(this), pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
         dao.grant(address(dao), address(pluginSetupProcessor), dao.ROOT_PERMISSION_ID());
 
         // INSTALL OLD BUILD (v1.2)
         PluginSetupRef memory oldSetupRef =
-            PluginSetupRef({versionTag: PluginRepo.Tag({release: 1, build: 2}), pluginSetupRepo: prodRepo});
+            PluginSetupRef({versionTag: PluginRepo.Tag({release: 1, build: 2}), pluginSetupRepo: liveRepo});
 
         // Prepare installation data compatible with build 2
         // Assumes build 1 `prepareInstallation` signature was: (VotingSettings, TokenSettings, MintSettings)
@@ -435,14 +422,15 @@ contract PluginSetupForkTest is ForkTestBase {
             initializeFromData = abi.encode(newMinApprovals, newTargetConfig, newMetadata);
         }
 
+        address pluginAddr;
         {
-            address pluginAddr;
             PluginSetupProcessor.PrepareInstallationParams memory prepareInstallParams =
                 PluginSetupProcessor.PrepareInstallationParams({pluginSetupRef: oldSetupRef, data: installDataV1});
 
             (pluginAddr, preparedSetupData) =
                 pluginSetupProcessor.prepareInstallation(address(dao), prepareInstallParams);
-            plugin = TokenVoting(pluginAddr);
+
+            vm.label(pluginAddr, "NewTokenVoting");
 
             PluginSetupProcessor.ApplyInstallationParams memory applyInstallParams = PluginSetupProcessor
                 .ApplyInstallationParams({
@@ -451,16 +439,15 @@ contract PluginSetupForkTest is ForkTestBase {
                 permissions: preparedSetupData.permissions,
                 helpersHash: hashHelpers(preparedSetupData.helpers)
             });
-            pluginSetupProcessor.applyInstallation(pluginAddr, applyInstallParams);
+            pluginSetupProcessor.applyInstallation(address(dao), applyInstallParams);
 
             vm.assertTrue(
-                dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""),
-                "Plugin should be installed"
+                dao.isGranted(address(dao), pluginAddr, dao.EXECUTE_PERMISSION_ID(), ""), "Plugin should be installed"
             );
 
             // UPDATE TO LATEST BUILD
             PluginSetupRef memory latestSetupRef =
-                PluginSetupRef({versionTag: getLatestTag(prodRepo), pluginSetupRepo: prodRepo});
+                PluginSetupRef({versionTag: getLatestTag(liveRepo), pluginSetupRepo: liveRepo});
 
             // Prepare update data for the latest build
 
@@ -470,7 +457,7 @@ contract PluginSetupForkTest is ForkTestBase {
                 newVersionTag: latestSetupRef.versionTag,
                 pluginSetupRepo: repo,
                 setupPayload: IPluginSetup.SetupPayload({
-                    plugin: address(plugin),
+                    plugin: pluginAddr,
                     currentHelpers: preparedSetupData.helpers,
                     data: initializeFromData
                 })
@@ -479,7 +466,7 @@ contract PluginSetupForkTest is ForkTestBase {
             bytes memory initData;
             (initData, preparedSetupData) = pluginSetupProcessor.prepareUpdate(address(dao), updateParams);
             PluginSetupProcessor.ApplyUpdateParams memory applyUpdateParams = PluginSetupProcessor.ApplyUpdateParams({
-                plugin: address(plugin),
+                plugin: pluginAddr,
                 pluginSetupRef: latestSetupRef,
                 initData: initData,
                 permissions: preparedSetupData.permissions,
@@ -490,7 +477,7 @@ contract PluginSetupForkTest is ForkTestBase {
 
         // ASSERTIONS
         {
-            TokenVoting tokenVotingPlugin = TokenVoting(plugin);
+            TokenVoting tokenVotingPlugin = TokenVoting(pluginAddr);
             assertEq(tokenVotingPlugin.implementation(), newImplementation, "Implementation not updated");
             assertEq(tokenVotingPlugin.minApproval(), 200_000, "minApproval not updated");
             assertEq(tokenVotingPlugin.getTargetConfig().target, makeAddr("newTarget-2"), "Target address not updated");
