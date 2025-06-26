@@ -140,6 +140,10 @@ contract PluginSetupForkTest is ForkTestBase {
             assertFalse(tokenVotingPlugin.isMember(bob), "Bob should not be a member");
         }
 
+        // Move forward (avoid collisions)
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+
         // UNINSTALLATION
         // Prepare and apply the uninstallation
         {
@@ -241,6 +245,10 @@ contract PluginSetupForkTest is ForkTestBase {
             assertFalse(tokenVotingPlugin.isMember(bob), "Bob should not be a member");
         }
 
+        // Move forward (avoid collisions)
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+
         // UNINSTALLATION
         // Prepare and apply the uninstallation
         {
@@ -284,6 +292,7 @@ contract PluginSetupForkTest is ForkTestBase {
         PluginRepo liveRepo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
 
         dao.grant(address(pluginSetupProcessor), address(this), pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
+        dao.grant(address(pluginSetupProcessor), address(this), pluginSetupProcessor.APPLY_UPDATE_PERMISSION_ID());
         dao.grant(address(dao), address(pluginSetupProcessor), dao.ROOT_PERMISSION_ID());
 
         // INSTALL OLD BUILD (v1.1)
@@ -302,7 +311,6 @@ contract PluginSetupForkTest is ForkTestBase {
 
         bytes memory initializeFromData;
         IPluginSetup.PreparedSetupData memory preparedSetupData;
-        address newImplementation;
         {
             uint256 newMinApprovals = 100_000;
             IPlugin.TargetConfig memory newTargetConfig =
@@ -312,6 +320,7 @@ contract PluginSetupForkTest is ForkTestBase {
         }
 
         address pluginAddr;
+        address oldImplementation;
         {
             PluginSetupProcessor.PrepareInstallationParams memory prepareInstallParams =
                 PluginSetupProcessor.PrepareInstallationParams({pluginSetupRef: oldSetupRef, data: installDataV1});
@@ -320,6 +329,8 @@ contract PluginSetupForkTest is ForkTestBase {
                 pluginSetupProcessor.prepareInstallation(address(dao), prepareInstallParams);
 
             vm.label(pluginAddr, "NewTokenVoting");
+            dao.grant(pluginAddr, address(pluginSetupProcessor), TokenVoting(pluginAddr).UPGRADE_PLUGIN_PERMISSION_ID());
+            oldImplementation = TokenVoting(pluginAddr).implementation();
 
             PluginSetupProcessor.ApplyInstallationParams memory applyInstallParams = PluginSetupProcessor
                 .ApplyInstallationParams({
@@ -333,6 +344,10 @@ contract PluginSetupForkTest is ForkTestBase {
             vm.assertTrue(
                 dao.isGranted(address(dao), pluginAddr, dao.EXECUTE_PERMISSION_ID(), ""), "Plugin should be installed"
             );
+
+            // Move forward (avoid collisions)
+            vm.roll(block.number + 1);
+            vm.warp(block.timestamp + 1);
 
             // UPDATE TO LATEST BUILD
             PluginSetupRef memory latestSetupRef =
@@ -367,7 +382,7 @@ contract PluginSetupForkTest is ForkTestBase {
         // ASSERTIONS
         {
             TokenVoting tokenVotingPlugin = TokenVoting(pluginAddr);
-            assertEq(tokenVotingPlugin.implementation(), newImplementation, "Implementation not updated");
+            assertNotEq(tokenVotingPlugin.implementation(), oldImplementation, "Implementation not updated");
             assertEq(tokenVotingPlugin.minApproval(), 100_000, "minApproval not updated");
             assertEq(tokenVotingPlugin.getTargetConfig().target, makeAddr("newTarget"), "Target address not updated");
             assertEq(
@@ -395,6 +410,7 @@ contract PluginSetupForkTest is ForkTestBase {
         PluginRepo liveRepo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
 
         dao.grant(address(pluginSetupProcessor), address(this), pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
+        dao.grant(address(pluginSetupProcessor), address(this), pluginSetupProcessor.APPLY_UPDATE_PERMISSION_ID());
         dao.grant(address(dao), address(pluginSetupProcessor), dao.ROOT_PERMISSION_ID());
 
         // INSTALL OLD BUILD (v1.2)
@@ -413,7 +429,6 @@ contract PluginSetupForkTest is ForkTestBase {
 
         bytes memory initializeFromData;
         IPluginSetup.PreparedSetupData memory preparedSetupData;
-        address newImplementation;
         {
             uint256 newMinApprovals = 200_000;
             IPlugin.TargetConfig memory newTargetConfig =
@@ -423,6 +438,7 @@ contract PluginSetupForkTest is ForkTestBase {
         }
 
         address pluginAddr;
+        address oldImplementation;
         {
             PluginSetupProcessor.PrepareInstallationParams memory prepareInstallParams =
                 PluginSetupProcessor.PrepareInstallationParams({pluginSetupRef: oldSetupRef, data: installDataV1});
@@ -431,6 +447,8 @@ contract PluginSetupForkTest is ForkTestBase {
                 pluginSetupProcessor.prepareInstallation(address(dao), prepareInstallParams);
 
             vm.label(pluginAddr, "NewTokenVoting");
+            dao.grant(pluginAddr, address(pluginSetupProcessor), TokenVoting(pluginAddr).UPGRADE_PLUGIN_PERMISSION_ID());
+            oldImplementation = TokenVoting(pluginAddr).implementation();
 
             PluginSetupProcessor.ApplyInstallationParams memory applyInstallParams = PluginSetupProcessor
                 .ApplyInstallationParams({
@@ -444,6 +462,10 @@ contract PluginSetupForkTest is ForkTestBase {
             vm.assertTrue(
                 dao.isGranted(address(dao), pluginAddr, dao.EXECUTE_PERMISSION_ID(), ""), "Plugin should be installed"
             );
+
+            // Move forward (avoid collisions)
+            vm.roll(block.number + 1);
+            vm.warp(block.timestamp + 1);
 
             // UPDATE TO LATEST BUILD
             PluginSetupRef memory latestSetupRef =
@@ -478,7 +500,7 @@ contract PluginSetupForkTest is ForkTestBase {
         // ASSERTIONS
         {
             TokenVoting tokenVotingPlugin = TokenVoting(pluginAddr);
-            assertEq(tokenVotingPlugin.implementation(), newImplementation, "Implementation not updated");
+            assertNotEq(tokenVotingPlugin.implementation(), oldImplementation, "Implementation not updated");
             assertEq(tokenVotingPlugin.minApproval(), 200_000, "minApproval not updated");
             assertEq(tokenVotingPlugin.getTargetConfig().target, makeAddr("newTarget-2"), "Target address not updated");
             assertEq(
