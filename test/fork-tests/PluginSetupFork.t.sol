@@ -390,67 +390,115 @@ contract PluginSetupForkTest is ForkTestBase {
         }
     }
 
-    // modifier givenAPreviousPluginBuild2IsInstalledAndTheDeployerHasUpdatePermissions() {
-    //     _;
-    // }
+    modifier givenAPreviousPluginBuild2IsInstalledAndTheDeployerHasUpdatePermissions() {
+        _;
+    }
 
-    // function test_WhenUpdatingFromBuild2ToTheCurrentBuild()
-    //     external
-    //     givenAPreviousPluginBuild2IsInstalledAndTheDeployerHasUpdatePermissions
-    // {
-    //     // It updates from build 2 to the current build
+    function test_WhenUpdatingFromBuild2ToTheCurrentBuild()
+        external
+        givenAPreviousPluginBuild2IsInstalledAndTheDeployerHasUpdatePermissions
+    {
+        // It updates from build 2 to the current build
 
-    //     // SETUP: Create a DAO
-    //     (DAO dao,,,) = new ForkBuilder().build();
+        // SETUP: Create a DAO
+        (dao,,,) = new ForkBuilder().build();
 
-    //     // PERMISSIONS: Grant installation and update permissions
-    //     PluginRepo prodRepo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
+        // PERMISSIONS: Grant installation and update permissions
+        PluginRepo prodRepo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
 
-    //     dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
-    //     dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_UPDATE_PERMISSION_ID());
-    //     dao.grant(address(dao), address(pluginSetupProcessor), dao.ROOT_PERMISSION_ID());
+        dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_INSTALLATION_PERMISSION_ID());
+        dao.grant(address(pluginSetupProcessor), deployer, pluginSetupProcessor.APPLY_UPDATE_PERMISSION_ID());
+        dao.grant(address(dao), address(pluginSetupProcessor), dao.ROOT_PERMISSION_ID());
 
-    //     // INSTALL OLD BUILD (v1.2)
-    //     PluginSetupRef memory oldSetupRef =
-    //         PluginSetupRef({versionTag: PluginRepo.Tag({release: 1, build: 2}), pluginSetupRepo: prodRepo});
+        // INSTALL OLD BUILD (v1.2)
+        PluginSetupRef memory oldSetupRef =
+            PluginSetupRef({versionTag: PluginRepo.Tag({release: 1, build: 2}), pluginSetupRepo: prodRepo});
 
-    //     // Prepare installation data compatible with build 2
-    //     // Assumes build 2 `prepareInstallation` signature was: (VotingSettings, TokenSettings, MintSettings, TargetConfig)
-    //     MajorityVotingBase.VotingSettings memory votingSettings = MajorityVotingBase.VotingSettings(
-    //         MajorityVotingBase.VotingMode.VoteReplacement, 500_000, 100_000, 1 hours, 0
-    //     );
-    //     TokenVotingSetup.TokenSettings memory tokenSettings =
-    //         TokenVotingSetup.TokenSettings({addr: address(0), name: "Old Token", symbol: "OLD"});
-    //     GovernanceERC20.MintSettings memory mintSettings =
-    //         GovernanceERC20.MintSettings(new address[](0), new uint256[](0));
-    //     IPlugin.TargetConfig memory oldTargetConfig = IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call);
-    //     bytes memory installDataV2 = abi.encode(votingSettings, tokenSettings, mintSettings, oldTargetConfig);
+        // Prepare installation data compatible with build 2
+        // Assumes build 1 `prepareInstallation` signature was: (VotingSettings, TokenSettings, MintSettings)
+        MajorityVotingBase.VotingSettings memory votingSettings =
+            MajorityVotingBase.VotingSettings(MajorityVotingBase.VotingMode.Standard, 500_000, 100_000, 1 hours, 0);
+        TokenVotingSetup.TokenSettings memory tokenSettings =
+            TokenVotingSetup.TokenSettings({addr: address(0), name: "Old Token", symbol: "OLD"});
+        GovernanceERC20.MintSettings memory mintSettings =
+            GovernanceERC20.MintSettings(new address[](0), new uint256[](0));
+        bytes memory installDataV1 = abi.encode(votingSettings, tokenSettings, mintSettings);
 
-    //     (address plugin, IPluginSetup.PreparedSetupData memory preparedSetupData) =
-    //         pluginSetupProcessor.prepareInstallation(dao, oldSetupRef, installDataV2);
-    //     dao.applyInstallation(plugin, preparedSetupData);
+        bytes memory initializeFromData;
+        IPluginSetup.PreparedSetupData memory preparedSetupData;
+        address newImplementation;
+        {
+            uint256 newMinApprovals = 200_000;
+            IPlugin.TargetConfig memory newTargetConfig =
+                IPlugin.TargetConfig(makeAddr("newTarget-2"), IPlugin.Operation.Call);
+            bytes memory newMetadata = "0x22";
+            initializeFromData = abi.encode(newMinApprovals, newTargetConfig, newMetadata);
+        }
 
-    //     // UPDATE TO LATEST BUILD
-    //     PluginSetupRef memory latestSetupRef =
-    //         PluginSetupRef({versionTag: getLatestTag(prodRepo), pluginSetupRepo: prodRepo});
+        {
+            address pluginAddr;
+            PluginSetupProcessor.PrepareInstallationParams memory prepareInstallParams =
+                PluginSetupProcessor.PrepareInstallationParams({pluginSetupRef: oldSetupRef, data: installDataV1});
 
-    //     uint256 newMinApprovals = 123_456;
-    //     IPlugin.TargetConfig memory newTargetConfig =
-    //         IPlugin.TargetConfig(makeAddr("anotherTarget"), IPlugin.Operation.Call);
-    //     bytes memory newMetadata = "0x33";
-    //     bytes memory updateData = abi.encode(newMinApprovals, newTargetConfig, newMetadata);
+            (pluginAddr, preparedSetupData) =
+                pluginSetupProcessor.prepareInstallation(address(dao), prepareInstallParams);
+            plugin = TokenVoting(pluginAddr);
 
-    //     // Prepare and apply the update
-    //     (address newImplementation, bytes memory permissionChanges) =
-    //         pluginSetupProcessor.prepareUpdate(plugin, latestSetupRef, updateData);
-    //     dao.applyUpdate(plugin, newImplementation, permissionChanges);
+            PluginSetupProcessor.ApplyInstallationParams memory applyInstallParams = PluginSetupProcessor
+                .ApplyInstallationParams({
+                pluginSetupRef: oldSetupRef,
+                plugin: pluginAddr,
+                permissions: preparedSetupData.permissions,
+                helpersHash: hashHelpers(preparedSetupData.helpers)
+            });
+            pluginSetupProcessor.applyInstallation(pluginAddr, applyInstallParams);
 
-    //     // ASSERTIONS
-    //     TokenVoting tokenVotingPlugin = TokenVoting(plugin);
-    //     assertEq(tokenVotingPlugin.implementation(), newImplementation, "Implementation not updated");
-    //     assertEq(tokenVotingPlugin.minApproval(), newMinApprovals, "minApproval not updated");
-    //     (address targetAddr, IPlugin.Operation op) = tokenVotingPlugin.getTargetConfig();
-    //     assertEq(targetAddr, newTargetConfig.target, "Target address not updated");
-    //     assertEq(uint8(op), uint8(newTargetConfig.operation), "Target operation not updated");
-    // }
+            vm.assertTrue(
+                dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""),
+                "Plugin should be installed"
+            );
+
+            // UPDATE TO LATEST BUILD
+            PluginSetupRef memory latestSetupRef =
+                PluginSetupRef({versionTag: getLatestTag(prodRepo), pluginSetupRepo: prodRepo});
+
+            // Prepare update data for the latest build
+
+            // Prepare and apply the update
+            PluginSetupProcessor.PrepareUpdateParams memory updateParams = PluginSetupProcessor.PrepareUpdateParams({
+                currentVersionTag: oldSetupRef.versionTag,
+                newVersionTag: latestSetupRef.versionTag,
+                pluginSetupRepo: repo,
+                setupPayload: IPluginSetup.SetupPayload({
+                    plugin: address(plugin),
+                    currentHelpers: preparedSetupData.helpers,
+                    data: initializeFromData
+                })
+            });
+
+            bytes memory initData;
+            (initData, preparedSetupData) = pluginSetupProcessor.prepareUpdate(address(dao), updateParams);
+            PluginSetupProcessor.ApplyUpdateParams memory applyUpdateParams = PluginSetupProcessor.ApplyUpdateParams({
+                plugin: address(plugin),
+                pluginSetupRef: latestSetupRef,
+                initData: initData,
+                permissions: preparedSetupData.permissions,
+                helpersHash: hashHelpers(preparedSetupData.helpers)
+            });
+            pluginSetupProcessor.applyUpdate(address(dao), applyUpdateParams);
+        }
+
+        // ASSERTIONS
+        {
+            TokenVoting tokenVotingPlugin = TokenVoting(plugin);
+            assertEq(tokenVotingPlugin.implementation(), newImplementation, "Implementation not updated");
+            assertEq(tokenVotingPlugin.minApproval(), 200_000, "minApproval not updated");
+            assertEq(tokenVotingPlugin.getTargetConfig().target, makeAddr("newTarget-2"), "Target address not updated");
+            assertEq(
+                uint8(tokenVotingPlugin.getTargetConfig().operation),
+                uint8(IPlugin.Operation.Call),
+                "Target operation not updated"
+            );
+        }
+    }
 }
