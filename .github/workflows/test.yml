@@ -31,10 +31,11 @@ jobs:
 
       - name: Run Forge build
         run: |
-          forge build --sizes
+          forge build
         id: build
 
       - name: Run Forge tests
         run: |
-          forge test -vvv --no-match-path ./test/fork-tests/*
+          cp .env.example .env
+          make test
         id: test
