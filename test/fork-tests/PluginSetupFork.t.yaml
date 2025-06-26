@@ -11,11 +11,7 @@ PluginSetupForkTest:
         then:
           - it: installs & uninstalls the current build without a token
 
-  - given: A previous plugin (build 1) is installed and the deployer has update permissions
-    and:
-      - when: Updating from build 1 to the current build
-        then:
-          - it: updates from build 1 to the current build
+  # Build 1 has a placeholder on Sepolia
 
   - given: A previous plugin (build 2) is installed and the deployer has update permissions
     and:

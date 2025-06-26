@@ -523,7 +523,7 @@ TokenVotingTest
         └── It magnitudes of 10^66
 ```
 ```
-TokenVotingSetup
+TokenVotingSetupTest
 ├── When Calling supportsInterface0xffffffff
 │   └── It does not support the empty interface
 ├── When Calling governanceERC20Base and governanceWrappedERC20Base after initialization // This test is skipped if the network is ZkSync
@@ -572,17 +572,9 @@ UpgradingTest
 │       ├── It protocol versions are updated correctly
 │       ├── It new settings are applied
 │       └── It the original `initialize` function is disabled post-upgrade
-├── Given The contract is at R1 B2
-│   └── When Upgrading with initializeFrom 2
-│       ├── It upgrades from R1 B2 with `initializeFrom`
-│       ├── It The old `initialize` function fails during the upgrade
-│       ├── It initializeFrom succeeds
-│       ├── It protocol versions are updated correctly
-│       ├── It new settings are applied
-│       └── It the original `initialize` function is disabled post-upgrade
-└── Given The contract is at R1 B3
-    └── When Upgrading with initializeFrom 3
-        ├── It upgrades from R1 B3 with `initializeFrom`
+└── Given The contract is at R1 B2
+    └── When Upgrading with initializeFrom 2
+        ├── It upgrades from R1 B2 with `initializeFrom`
         ├── It The old `initialize` function fails during the upgrade
         ├── It initializeFrom succeeds
         ├── It protocol versions are updated correctly
@@ -597,9 +589,6 @@ PluginSetupForkTest
 ├── Given The deployer has all necessary permissions for installation and uninstallation 2
 │   └── When Installing and then uninstalling the current build creating a new token
 │       └── It installs & uninstalls the current build without a token
-├── Given A previous plugin build 1 is installed and the deployer has update permissions
-│   └── When Updating from build 1 to the current build
-│       └── It updates from build 1 to the current build
 └── Given A previous plugin build 2 is installed and the deployer has update permissions
     └── When Updating from build 2 to the current build
         └── It updates from build 2 to the current build
