@@ -45,9 +45,7 @@ contract PluginSetupForkTest is ForkTestBase {
     DAO internal dao;
     PluginRepo internal repo = PluginRepo(TOKEN_VOTING_REPO_ADDRESS);
 
-    function setUp() public virtual override {
-        super.setUp();
-
+    function setUp() public virtual {
         dao = new ForkBuilder().build();
     }
 
