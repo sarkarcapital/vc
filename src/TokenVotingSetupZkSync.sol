@@ -87,61 +87,63 @@ contract TokenVotingSetupZkSync is PluginUpgradeableSetup {
         external
         returns (address plugin, PreparedSetupData memory preparedSetupData)
     {
-        // Decode `_data` to extract the params needed for deploying and initializing `TokenVoting` plugin,
-        // and the required helpers
-        (
-            MajorityVotingBase.VotingSettings memory votingSettings,
-            TokenSettings memory tokenSettings,
-            // only used for GovernanceERC20(token is not passed)
-            GovernanceERC20.MintSettings memory mintSettings,
-            IPlugin.TargetConfig memory targetConfig,
-            uint256 minApprovals,
-            bytes memory pluginMetadata
-        ) = abi.decode(
-            _data,
+        TokenSettings memory tokenSettings;
+        address token;
+
+        {
+            MajorityVotingBase.VotingSettings memory votingSettings;
+            GovernanceERC20.MintSettings memory mintSettings;
+            IPlugin.TargetConfig memory targetConfig;
+            uint256 minApprovals;
+            bytes memory pluginMetadata;
+            address[] memory excludedAccounts;
+
+            // Decode `_data` to extract the params needed for deploying and initializing `TokenVoting` plugin,
+            // and the required helpers
             (
-                MajorityVotingBase.VotingSettings,
-                TokenSettings,
-                GovernanceERC20.MintSettings,
-                IPlugin.TargetConfig,
-                uint256,
-                bytes
-            )
-        );
+                votingSettings,
+                tokenSettings,
+                // only used for GovernanceERC20(token is not passed)
+                mintSettings,
+                targetConfig,
+                minApprovals,
+                pluginMetadata
+            ) = decodeInstallationParameters(_data);
 
-        address token = tokenSettings.addr;
+            token = tokenSettings.addr;
 
-        if (tokenSettings.addr != address(0)) {
-            if (!token.isContract()) {
-                revert TokenNotContract(token);
+            if (token != address(0)) {
+                if (!token.isContract()) {
+                    revert TokenNotContract(token);
+                }
+
+                if (!_isERC20(token)) {
+                    revert TokenNotERC20(token);
+                }
+
+                if (!supportsIVotesInterface(token)) {
+                    token = address(
+                        new GovernanceWrappedERC20(
+                            IERC20Upgradeable(tokenSettings.addr), tokenSettings.name, tokenSettings.symbol
+                        )
+                    );
+                }
+            } else {
+                token = address(new GovernanceERC20(IDAO(_dao), tokenSettings.name, tokenSettings.symbol, mintSettings));
             }
 
-            if (!_isERC20(token)) {
-                revert TokenNotERC20(token);
-            }
+            // Prepare and deploy plugin proxy.
+            plugin = address(tokenVotingBase).deployUUPSProxy(
+                abi.encodeCall(
+                    TokenVoting.initialize,
+                    (IDAO(_dao), votingSettings, IVotesUpgradeable(token), targetConfig, minApprovals, pluginMetadata)
+                )
+            );
 
-            if (!supportsIVotesInterface(token)) {
-                token = address(
-                    new GovernanceWrappedERC20(
-                        IERC20Upgradeable(tokenSettings.addr), tokenSettings.name, tokenSettings.symbol
-                    )
-                );
-            }
-        } else {
-            token = address(new GovernanceERC20(IDAO(_dao), tokenSettings.name, tokenSettings.symbol, mintSettings));
+            preparedSetupData.helpers = new address[](2);
+            preparedSetupData.helpers[0] = address(new VotingPowerCondition(plugin));
+            preparedSetupData.helpers[1] = token;
         }
-
-        // Prepare and deploy plugin proxy.
-        plugin = address(tokenVotingBase).deployUUPSProxy(
-            abi.encodeCall(
-                TokenVoting.initialize,
-                (IDAO(_dao), votingSettings, IVotesUpgradeable(token), targetConfig, minApprovals, pluginMetadata)
-            )
-        );
-
-        preparedSetupData.helpers = new address[](2);
-        preparedSetupData.helpers[0] = address(new VotingPowerCondition(plugin));
-        preparedSetupData.helpers[1] = token;
 
         // Prepare permissions
         PermissionLib.MultiTargetPermission[] memory permissions =
@@ -330,6 +332,46 @@ contract TokenVotingSetupZkSync is PluginUpgradeableSetup {
             condition: PermissionLib.NO_CONDITION,
             permissionId: EXECUTE_PROPOSAL_PERMISSION_ID
         });
+    }
+
+    /// @notice Encodes the given installation parameters into a byte array
+    function encodeInstallationParameters(
+        MajorityVotingBase.VotingSettings memory votingSettings,
+        TokenSettings memory tokenSettings,
+        // only used for GovernanceERC20(token is not passed)
+        GovernanceERC20.MintSettings memory mintSettings,
+        IPlugin.TargetConfig memory targetConfig,
+        uint256 minApprovals,
+        bytes memory pluginMetadata
+    ) external pure returns (bytes memory) {
+        return abi.encode(votingSettings, tokenSettings, mintSettings, targetConfig, minApprovals, pluginMetadata);
+    }
+
+    /// @notice Decodes the given byte array into the original installation parameters
+    function decodeInstallationParameters(bytes memory _data)
+        public
+        pure
+        returns (
+            MajorityVotingBase.VotingSettings memory votingSettings,
+            TokenSettings memory tokenSettings,
+            // only used for GovernanceERC20(token is not passed)
+            GovernanceERC20.MintSettings memory mintSettings,
+            IPlugin.TargetConfig memory targetConfig,
+            uint256 minApprovals,
+            bytes memory pluginMetadata
+        )
+    {
+        return abi.decode(
+            _data,
+            (
+                MajorityVotingBase.VotingSettings,
+                TokenSettings,
+                GovernanceERC20.MintSettings,
+                IPlugin.TargetConfig,
+                uint256,
+                bytes
+            )
+        );
     }
 
     /// @notice Unsatisfiably determines if the token is an IVotes interface.
