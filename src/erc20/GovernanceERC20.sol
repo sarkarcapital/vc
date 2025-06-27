@@ -36,6 +36,9 @@ contract GovernanceERC20 is
     /// @notice The permission identifier to mint new tokens
     bytes32 public constant MINT_PERMISSION_ID = keccak256("MINT_PERMISSION");
 
+    /// @notice Wether mint() has been permanently disabled
+    bool public mintingFrozen;
+
     /// @notice The settings for the initial mint of the token.
     /// @param receivers The receivers of the tokens.
     /// @param amounts The amounts of tokens to be minted for each receiver.
@@ -45,10 +48,16 @@ contract GovernanceERC20 is
         uint256[] amounts;
     }
 
+    /// @notice Emitted when minting is frozen permanently
+    event MintingFrozen();
+
     /// @notice Thrown if the number of receivers and amounts specified in the mint settings do not match.
     /// @param receiversArrayLength The length of the `receivers` array.
     /// @param amountsArrayLength The length of the `amounts` array.
     error MintSettingsArrayLengthMismatch(uint256 receiversArrayLength, uint256 amountsArrayLength);
+
+    /// @notice Thrown when attempting to mint when minting is permanently disabled
+    error MintingIsFrozen();
 
     /// @notice Calls the initialize function.
     /// @param _dao The managing DAO.
@@ -104,7 +113,19 @@ contract GovernanceERC20 is
     /// @param to The address receiving the tokens.
     /// @param amount The amount of tokens to be minted.
     function mint(address to, uint256 amount) external override auth(MINT_PERMISSION_ID) {
+        if (mintingFrozen) {
+            revert MintingIsFrozen();
+        }
+
         _mint(to, amount);
+    }
+
+    /// @notice Disables the mint() function permanently
+    function freezeMinting() external auth(MINT_PERMISSION_ID) {
+        if (mintingFrozen) return;
+
+        mintingFrozen = true;
+        emit MintingFrozen();
     }
 
     // https://forum.openzeppelin.com/t/self-delegation-in-erc20votes/17501/12?u=novaknole
