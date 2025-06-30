@@ -31,6 +31,9 @@ contract GovernanceERC20Test is TestBase {
     address internal fromDelegate;
 
     event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
+    event MintingFrozen();
+
+    error MintingIsFrozen();
 
     function setUp() public {
         dao = DAO(
@@ -659,5 +662,112 @@ contract GovernanceERC20Test is TestBase {
         assertEq(token.getVotes(to), 0, "`to` has the correct voting power");
         assertEq(token.delegates(to), other, "`to`s delegate is correctly changed");
         assertEq(token.getVotes(other), 200, "`to`s delegate has the correct voting power");
+    }
+
+    modifier givenMintingIsAllowed() {
+        dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
+
+        _;
+    }
+
+    function test_GivenCallingMintWithThePermission() external givenMintingIsAllowed {
+        // It Should mint properly
+        uint256 initialBalance = token.balanceOf(alice);
+        uint256 initialSupply = token.totalSupply();
+
+        token.mint(alice, 10 ether);
+        assertEq(token.balanceOf(alice), initialBalance + 10 ether);
+        assertEq(token.totalSupply(), initialSupply + 10 ether);
+    }
+
+    function test_RevertGiven_CallingMintWithoutThePermission() external givenMintingIsAllowed {
+        // It Should revert
+        uint256 initialBalance = token.balanceOf(alice);
+        uint256 initialSupply = token.totalSupply();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DaoUnauthorized.selector, address(dao), address(token), bob, token.MINT_PERMISSION_ID()
+            )
+        );
+        vm.prank(bob);
+        token.mint(alice, 10 ether);
+        assertEq(token.balanceOf(alice), initialBalance);
+        assertEq(token.totalSupply(), initialSupply);
+    }
+
+    function test_GivenCallingFreezeMintingWithThePermission() external givenMintingIsAllowed {
+        // It Should disallow mints from then on
+
+        uint256 initialBalance = token.balanceOf(alice);
+        uint256 initialSupply = token.totalSupply();
+
+        token.mint(alice, 10 ether);
+        assertEq(token.balanceOf(alice), initialBalance + 10 ether);
+        assertEq(token.totalSupply(), initialSupply + 10 ether);
+
+        vm.expectEmit();
+        emit MintingFrozen();
+        token.freezeMinting();
+
+        // KO
+        initialBalance = token.balanceOf(alice);
+        initialSupply = token.totalSupply();
+
+        vm.expectRevert(MintingIsFrozen.selector);
+        token.mint(alice, 10 ether);
+        assertEq(token.balanceOf(alice), initialBalance);
+        assertEq(token.totalSupply(), initialSupply);
+    }
+
+    function test_RevertGiven_CallingFreezeMintingWithoutThePermission() external givenMintingIsAllowed {
+        // It Should revert
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DaoUnauthorized.selector, address(dao), address(token), bob, token.MINT_PERMISSION_ID()
+            )
+        );
+        vm.prank(bob);
+        token.freezeMinting();
+    }
+
+    modifier givenMintingIsFrozen() {
+        dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
+        token.freezeMinting();
+
+        _;
+    }
+
+    function test_RevertGiven_CallingMintWithThePermission2() external givenMintingIsFrozen {
+        // It Should revert
+        vm.expectRevert(MintingIsFrozen.selector);
+        token.mint(alice, 10 ether);
+    }
+
+    function test_RevertGiven_CallingMintWithoutThePermission2() external givenMintingIsFrozen {
+        // It Should revert
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DaoUnauthorized.selector, address(dao), address(token), bob, token.MINT_PERMISSION_ID()
+            )
+        );
+        vm.prank(bob);
+        token.mint(alice, 10 ether);
+    }
+
+    function test_GivenCallingFreezeMintingWithThePermission2() external givenMintingIsFrozen {
+        // It Should do nothing
+        token.freezeMinting();
+    }
+
+    function test_RevertGiven_CallingFreezeMintingWithoutThePermission2() external givenMintingIsFrozen {
+        // It Should revert
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DaoUnauthorized.selector, address(dao), address(token), bob, token.MINT_PERMISSION_ID()
+            )
+        );
+        vm.prank(bob);
+        token.freezeMinting();
     }
 }
