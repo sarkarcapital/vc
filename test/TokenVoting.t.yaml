@@ -283,7 +283,7 @@ TokenVotingTest:
           - when: The number of casted votes is one shy of 100% participation
             then:
               - it: participation is not met with 1 vote missing
-  - given: Execution criteria handle token balances for multiple orders of magnitude
+  - given: "Execution criteria: multiple orders of magnitude"
     and:
       - when: Testing with a magnitude of 10^0
         then:

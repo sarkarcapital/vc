@@ -54,3 +54,49 @@ TokenVotingSetupTest:
       - when: Calling prepareUninstallation and helpers contain a GovernanceERC20 token
         then:
           - it: correctly returns permissions, when the required number of helpers is supplied
+  - given: The installation parameters are defined
+    and:
+      - when: Calling encodeInstallationParameters() with the parameters
+        then:
+          - it: Should return the correct ABI-encoded byte representation
+      - when: Calling decodeInstallationParameters() with the encoded data
+        then:
+          - it: Should return the original installation parameters
+
+  - given: The installation request is for a new token
+    comment: The token address in TokenSettings is address(0)
+    and:
+      - when: Calling prepareInstallation()
+        then:
+          - it: Should return exactly 7 permissions to be granted, including one for minting
+
+  - given: The installation request is for an existing IVotes-compliant token
+    and:
+      - when: Calling prepareInstallation()
+        then:
+          - it: Should return exactly 6 permissions to be granted and NOT deploy a new token
+
+  - given: A plugin is being updated from a build version less than 3
+    and:
+      - when: Calling prepareUpdate() with _fromBuild = 2
+        then:
+          - it: Should return the initData for the update and a new VotingPowerCondition helper
+          - it: Should return 5 permission changes (1 revoke and 4 grants)
+
+  - given: A plugin is being uninstalled
+    and:
+      - when: Calling prepareUninstallation()
+        then:
+          - it: Should return exactly 6 permissions to be revoked
+
+  - given: A token contract that implements the IVotes interface functions
+    and:
+      - when: Calling supportsIVotesInterface() with the token's address
+        then:
+          - it: Should return true
+
+  - given: A token contract that does not implement the IVotes interface functions
+    and:
+      - when: Calling supportsIVotesInterface() with the token's address
+        then:
+          - it: Should return false

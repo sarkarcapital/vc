@@ -521,7 +521,7 @@ TokenVotingTest
 │       │   └── It early support criterion is sharp by 1 vote
 │       └── When The number of casted votes is one shy of 100 participation 2
 │           └── It participation is not met with 1 vote missing
-└── Given Execution criteria handle token balances for multiple orders of magnitude
+└── Given Execution criteria multiple orders of magnitude
     ├── When Testing with a magnitude of 100
     │   └── It magnitudes of 10^0
     ├── When Testing with a magnitude of 101
@@ -579,11 +579,35 @@ TokenVotingSetupTest
 │   │   └── It returns the permissions expected for the update from build 2
 │   └── When Calling prepareUpdate for an update from build 3
 │       └── It returns the permissions expected for the update from build 3 (empty list)
-└── Given The context is prepareUninstallation
-    ├── When Calling prepareUninstallation and helpers contain a GovernanceWrappedERC20 token
-    │   └── It correctly returns permissions, when the required number of helpers is supplied
-    └── When Calling prepareUninstallation and helpers contain a GovernanceERC20 token
-        └── It correctly returns permissions, when the required number of helpers is supplied
+├── Given The context is prepareUninstallation
+│   ├── When Calling prepareUninstallation and helpers contain a GovernanceWrappedERC20 token
+│   │   └── It correctly returns permissions, when the required number of helpers is supplied
+│   └── When Calling prepareUninstallation and helpers contain a GovernanceERC20 token
+│       └── It correctly returns permissions, when the required number of helpers is supplied
+├── Given The installation parameters are defined
+│   ├── When Calling encodeInstallationParameters with the parameters
+│   │   └── It Should return the correct ABI-encoded byte representation
+│   └── When Calling decodeInstallationParameters with the encoded data
+│       └── It Should return the original installation parameters
+├── Given The installation request is for a new token // The token address in TokenSettings is address(0)
+│   └── When Calling prepareInstallation
+│       └── It Should return exactly 7 permissions to be granted, including one for minting
+├── Given The installation request is for an existing IVotescompliant token
+│   └── When Calling prepareInstallation 2
+│       └── It Should return exactly 6 permissions to be granted and NOT deploy a new token
+├── Given A plugin is being updated from a build version less than 3
+│   └── When Calling prepareUpdate with fromBuild  2
+│       ├── It Should return the initData for the update and a new VotingPowerCondition helper
+│       └── It Should return 5 permission changes (1 revoke and 4 grants)
+├── Given A plugin is being uninstalled
+│   └── When Calling prepareUninstallation
+│       └── It Should return exactly 6 permissions to be revoked
+├── Given A token contract that implements the IVotes interface functions
+│   └── When Calling supportsIVotesInterface with the tokens address
+│       └── It Should return true
+└── Given A token contract that does not implement the IVotes interface functions
+    └── When Calling supportsIVotesInterface with the tokens address 2
+        └── It Should return false
 ```
 ```
 UpgradingTest
