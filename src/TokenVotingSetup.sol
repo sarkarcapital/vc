@@ -111,7 +111,6 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
             IPlugin.TargetConfig memory targetConfig;
             uint256 minApprovals;
             bytes memory pluginMetadata;
-            address[] memory excludedAccounts;
 
             // Decode `_data` to extract the params needed for deploying and initializing `TokenVoting` plugin,
             // and the required helpers

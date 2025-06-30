@@ -586,4 +586,597 @@ contract TokenVotingSetupTest is TestBase {
             UPDATE_VOTING_SETTINGS_PERMISSION_ID
         );
     }
+
+    function _encodeInstallData(
+        MajorityVotingBase.VotingSettings memory _votingSettings,
+        PluginSetupContract.TokenSettings memory _tokenSettings,
+        GovernanceERC20.MintSettings memory _mintSettings,
+        IPlugin.TargetConfig memory _targetConfig,
+        uint256 _minApproval,
+        bytes memory _metadata
+    ) internal pure returns (bytes memory) {
+        return abi.encode(_votingSettings, _tokenSettings, _mintSettings, _targetConfig, _minApproval, _metadata);
+    }
+
+    function test_whenCallingBasesAfterInitialization_itStoresTheBasesProvided() external view {
+        assertEq(pluginSetup.governanceERC20Base(), address(governanceERC20Base));
+        assertEq(pluginSetup.governanceWrappedERC20Base(), address(governanceWrappedERC20Base));
+    }
+
+    function test_failsIfDataIsEmptyOrNotOfMinLength() external givenTheContextIsPrepareInstallation {
+        bytes memory data = "";
+        vm.expectRevert();
+        pluginSetup.prepareInstallation(address(dao), data);
+
+        data = hex"000000"; // not min length
+        vm.expectRevert();
+        pluginSetup.prepareInstallation(address(dao), data);
+    }
+
+    function test_failsIfMintSettingsArraysDoNotHaveTheSameLength() external givenTheContextIsPrepareInstallation {
+        address[] memory receivers = new address[](1);
+        receivers[0] = alice;
+        defaultMintSettings.receivers = receivers;
+        defaultMintSettings.amounts = new uint256[](2); // Mismatch
+
+        bytes memory installData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                GovernanceERC20.MintSettingsArrayLengthMismatch.selector,
+                receivers.length,
+                defaultMintSettings.amounts.length
+            )
+        );
+        pluginSetup.prepareInstallation(address(dao), installData);
+    }
+
+    function test_failsIfPassedTokenAddressIsNotAContract() external givenTheContextIsPrepareInstallation {
+        defaultTokenSettings.addr = alice; // EOA, not a contract
+        bytes memory installData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+
+        vm.expectRevert();
+        pluginSetup.prepareInstallation(address(dao), installData);
+    }
+
+    function test_failsIfPassedTokenAddressIsNotERC20() external givenTheContextIsPrepareInstallation {
+        // DAO contract is not an ERC20 token
+        defaultTokenSettings.addr = address(dao);
+        bytes memory installData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+
+        vm.expectRevert();
+        pluginSetup.prepareInstallation(address(dao), installData);
+    }
+
+    function test_correctlyReturnsPluginHelpersAndPermissions_whenAnERC20TokenAddressIsSupplied()
+        external
+        givenTheContextIsPrepareInstallation
+    {
+        ERC20Mock erc20 = new ERC20Mock("Test", "TST");
+        defaultTokenSettings.addr = address(erc20);
+
+        bytes memory installData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+
+        (address plugin, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareInstallation(address(dao), installData);
+
+        assertTrue(plugin != address(0));
+        assertEq(prepared.helpers.length, 2, "Should have 2 helpers (Condition, GovernanceWrappedERC20)");
+        assertEq(prepared.permissions.length, 6, "Should have 6 permissions");
+    }
+
+    function test_correctlySetsUpGovernanceWrappedERC20Helper_whenAnERC20TokenAddressIsSupplied()
+        external
+        givenTheContextIsPrepareInstallation
+    {
+        ERC20Mock erc20 = new ERC20Mock("Test", "TST");
+        defaultTokenSettings.addr = address(erc20);
+
+        bytes memory installData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+
+        (, IPluginSetup.PreparedSetupData memory prepared) = pluginSetup.prepareInstallation(address(dao), installData);
+
+        assertEq(prepared.helpers.length, 2, "Should have 2 helpers (Condition, GovernanceWrappedERC20)");
+        address helperAddr = prepared.helpers[1];
+        GovernanceWrappedERC20 wrappedToken = GovernanceWrappedERC20(helperAddr);
+
+        assertEq(address(wrappedToken.underlying()), address(erc20), "Underlying token should match");
+        assertEq(wrappedToken.name(), defaultTokenSettings.name, "Wrapped token name should match");
+        assertEq(wrappedToken.symbol(), defaultTokenSettings.symbol, "Wrapped token symbol should match");
+    }
+
+    function test_correctlyReturnsPluginHelpersAndPermissions_whenAGovernanceTokenAddressIsSupplied()
+        external
+        givenTheContextIsPrepareInstallation
+    {
+        (,, IVotesUpgradeable govToken,) = new SimpleBuilder().build();
+        defaultTokenSettings.addr = address(govToken);
+
+        bytes memory installData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+
+        (address plugin, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareInstallation(address(dao), installData);
+
+        assertTrue(plugin != address(0));
+        assertEq(prepared.helpers.length, 2, "Should have 2 helpers");
+        assertEq(prepared.permissions.length, 6, "Should have 6 permissions");
+    }
+
+    function test_correctlyReturnsPluginHelpersAndPermissions_whenATokenAddressIsNotSupplied()
+        external
+        givenTheContextIsPrepareInstallation
+    {
+        defaultTokenSettings.addr = address(0);
+        bytes memory installData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+
+        (address plugin, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareInstallation(address(dao), installData);
+
+        assertTrue(plugin != address(0));
+        assertEq(prepared.helpers.length, 2, "Should have 2 helpers");
+        assertEq(prepared.permissions.length, 7, "Should have 7 permissions (including MINT)");
+    }
+
+    function test_correctlySetsUpThePluginAndHelpers_whenATokenAddressIsNotPassed()
+        external
+        givenTheContextIsPrepareInstallation
+    {
+        defaultTokenSettings.addr = address(0);
+        address[] memory receivers = new address[](2);
+        receivers[0] = alice;
+        receivers[1] = bob;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 100 ether;
+        amounts[1] = 200 ether;
+        defaultMintSettings.receivers = receivers;
+        defaultMintSettings.amounts = amounts;
+
+        bytes memory installData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+
+        (address pluginAddr, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareInstallation(address(dao), installData);
+
+        assertEq(prepared.helpers.length, 2, "Should have 2 helpers (Condition, GovernanceERC20)");
+
+        address helperAddr = prepared.helpers[1];
+        GovernanceERC20 newToken = GovernanceERC20(helperAddr);
+        TokenVoting plugin = TokenVoting(pluginAddr);
+
+        assertEq(newToken.name(), defaultTokenSettings.name, "New token name should match");
+        assertEq(newToken.symbol(), defaultTokenSettings.symbol, "New token symbol should match");
+        assertEq(address(plugin.getVotingToken()), helperAddr, "Plugin should point to the new token");
+    }
+
+    function test_returnsThePermissionsExpectedForTheUpdateFromBuild1() external givenTheContextIsPrepareUpdate {
+        (, TokenVoting plugin,,) = new SimpleBuilder().build();
+        address pluginAddr = address(plugin);
+        bytes memory updateInnerData =
+            abi.encode(uint256(0), IPlugin.TargetConfig(address(0), IPlugin.Operation.Call), "");
+        IPluginSetup.SetupPayload memory updatePayload =
+            IPluginSetup.SetupPayload({plugin: pluginAddr, currentHelpers: new address[](2), data: updateInnerData});
+
+        (bytes memory initData, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareUpdate(address(dao), 1, updatePayload);
+
+        assertEq(initData.length, 260);
+        assertEq(prepared.helpers.length, 1);
+        assertEq(prepared.permissions.length, 5); // 1 revoke, 4 grants
+    }
+
+    function test_returnsThePermissionsExpectedForTheUpdateFromBuild2() external givenTheContextIsPrepareUpdate {
+        (, TokenVoting plugin,,) = new SimpleBuilder().build();
+        address pluginAddr = address(plugin);
+        bytes memory updateInnerData =
+            abi.encode(uint256(0), IPlugin.TargetConfig(address(0), IPlugin.Operation.Call), "");
+        IPluginSetup.SetupPayload memory updatePayload =
+            IPluginSetup.SetupPayload({plugin: pluginAddr, currentHelpers: new address[](2), data: updateInnerData});
+
+        (bytes memory initData, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareUpdate(address(dao), 2, updatePayload);
+
+        assertTrue(initData.length > 0);
+        assertEq(prepared.helpers.length, 1); // VotingPowerCondition
+        assertEq(prepared.permissions.length, 5); // 1 revoke, 4 grants
+    }
+
+    function test_returnsThePermissionsExpectedForTheUpdateFromBuild3() external givenTheContextIsPrepareUpdate {
+        (, TokenVoting plugin,,) = new SimpleBuilder().build();
+        address pluginAddr = address(plugin);
+        bytes memory updateInnerData =
+            abi.encode(uint256(0), IPlugin.TargetConfig(address(0), IPlugin.Operation.Call), "");
+        IPluginSetup.SetupPayload memory updatePayload =
+            IPluginSetup.SetupPayload({plugin: pluginAddr, currentHelpers: new address[](2), data: updateInnerData});
+
+        (bytes memory initData, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareUpdate(address(dao), 3, updatePayload);
+
+        assertEq(initData.length, 0);
+        assertEq(prepared.helpers.length, 0);
+        assertEq(prepared.permissions.length, 0);
+    }
+
+    function test_correctlyReturnsPermissions_whenUninstallationAndHelpersContainGovernanceWrappedERC20()
+        external
+        givenTheContextIsPrepareUninstallation
+    {
+        (, TokenVoting plugin,,) = new SimpleBuilder().build();
+        address pluginAddr = address(plugin);
+        address[] memory helpers = new address[](1);
+        helpers[0] = address(governanceWrappedERC20Base);
+
+        IPluginSetup.SetupPayload memory payload =
+            IPluginSetup.SetupPayload({plugin: pluginAddr, currentHelpers: helpers, data: ""});
+
+        PermissionLib.MultiTargetPermission[] memory permissions =
+            pluginSetup.prepareUninstallation(address(dao), payload);
+
+        assertEq(permissions.length, 6, "Should revoke 6 permissions");
+    }
+
+    function test_correctlyReturnsPermissions_whenUninstallationAndHelpersContainGovernanceERC20()
+        external
+        givenTheContextIsPrepareUninstallation
+    {
+        (, TokenVoting plugin,,) = new SimpleBuilder().build();
+        address pluginAddr = address(plugin);
+        address[] memory helpers = new address[](1);
+        helpers[0] = address(governanceERC20Base);
+
+        IPluginSetup.SetupPayload memory payload =
+            IPluginSetup.SetupPayload({plugin: pluginAddr, currentHelpers: helpers, data: ""});
+
+        PermissionLib.MultiTargetPermission[] memory permissions =
+            pluginSetup.prepareUninstallation(address(dao), payload);
+
+        assertEq(permissions.length, 6, "Should revoke 6 permissions");
+    }
+
+    modifier givenTheInstallationParametersAreDefined() {
+        address[] memory receivers = new address[](2);
+        receivers[0] = alice;
+        receivers[1] = bob;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 100e18;
+        amounts[1] = 200e18;
+        defaultMintSettings = GovernanceERC20.MintSettings(receivers, amounts);
+        _;
+    }
+
+    function test_WhenCallingEncodeInstallationParametersWithTheParameters()
+        external
+        givenTheInstallationParametersAreDefined
+    {
+        bytes memory encodedData = pluginSetup.encodeInstallationParameters(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+
+        bytes memory expectedData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+
+        assertEq(encodedData, expectedData, "Encoded data does not match expected ABI encoding");
+    }
+
+    function test_WhenCallingDecodeInstallationParametersWithTheEncodedData()
+        external
+        givenTheInstallationParametersAreDefined
+    {
+        bytes memory encodedData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+
+        (
+            MajorityVotingBase.VotingSettings memory votingSettings,
+            PluginSetupContract.TokenSettings memory tokenSettings,
+            GovernanceERC20.MintSettings memory mintSettings,
+            IPlugin.TargetConfig memory targetConfig,
+            uint256 minApproval,
+            bytes memory metadata
+        ) = pluginSetup.decodeInstallationParameters(encodedData);
+
+        assertEq(uint8(votingSettings.votingMode), uint8(defaultVotingSettings.votingMode));
+        assertEq(votingSettings.supportThreshold, defaultVotingSettings.supportThreshold);
+        assertEq(votingSettings.minParticipation, defaultVotingSettings.minParticipation);
+        assertEq(tokenSettings.addr, defaultTokenSettings.addr);
+        assertEq(tokenSettings.name, defaultTokenSettings.name);
+        assertEq(tokenSettings.symbol, defaultTokenSettings.symbol);
+        assertEq(mintSettings.receivers.length, defaultMintSettings.receivers.length);
+        assertEq(mintSettings.receivers[0], defaultMintSettings.receivers[0]);
+        assertEq(mintSettings.amounts[1], defaultMintSettings.amounts[1]);
+        assertEq(targetConfig.target, defaultTargetConfig.target);
+        assertEq(uint256(targetConfig.operation), uint256(defaultTargetConfig.operation));
+        assertEq(minApproval, defaultMinApproval);
+        assertEq(metadata, defaultMetadata);
+    }
+
+    modifier givenTheInstallationRequestIsForANewToken() {
+        defaultTokenSettings.addr = address(0);
+        address[] memory receivers = new address[](1);
+        receivers[0] = alice;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 1 ether;
+        defaultMintSettings = GovernanceERC20.MintSettings(receivers, amounts);
+        _;
+    }
+
+    function test_WhenCallingPrepareInstallation_shouldReturnCorrectPermissionsForNewToken()
+        external
+        givenTheInstallationRequestIsForANewToken
+    {
+        bytes memory installData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+        (, IPluginSetup.PreparedSetupData memory prepared) = pluginSetup.prepareInstallation(address(dao), installData);
+        assertEq(
+            prepared.permissions.length,
+            7,
+            "Should return exactly 7 permissions to be granted, including one for minting"
+        );
+    }
+
+    modifier givenTheInstallationRequestIsForAnExistingIVotescompliantToken() {
+        (,, IVotesUpgradeable govToken,) = new SimpleBuilder().build();
+        defaultTokenSettings.addr = address(govToken);
+        _;
+    }
+
+    function test_WhenCallingPrepareInstallation_shouldReturnCorrectPermissionsForExistingToken()
+        external
+        givenTheInstallationRequestIsForAnExistingIVotescompliantToken
+    {
+        bytes memory installData = _encodeInstallData(
+            defaultVotingSettings,
+            defaultTokenSettings,
+            defaultMintSettings,
+            defaultTargetConfig,
+            defaultMinApproval,
+            defaultMetadata
+        );
+        (address plugin, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareInstallation(address(dao), installData);
+        assertTrue(plugin != address(0));
+        assertEq(prepared.helpers.length, 2);
+        assertEq(
+            prepared.permissions.length,
+            6,
+            "Should return exactly 6 permissions to be granted and NOT deploy a new token"
+        );
+    }
+
+    modifier givenAPluginIsBeingUpdatedFromABuildVersionLessThan3() {
+        // This modifier is intentionally left empty for clarity in test definitions.
+        _;
+    }
+
+    function test_WhenCallingPrepareUpdateWithFromBuild2_returnsCorrectDataAndPermissions()
+        external
+        givenAPluginIsBeingUpdatedFromABuildVersionLessThan3
+    {
+        (, TokenVoting plugin,,) = new SimpleBuilder().build();
+        address pluginAddr = address(plugin);
+        address[] memory currentHelpers = new address[](2);
+
+        bytes memory updateInnerData =
+            abi.encode(uint256(2), IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call), "");
+        IPluginSetup.SetupPayload memory updatePayload =
+            IPluginSetup.SetupPayload({plugin: pluginAddr, currentHelpers: currentHelpers, data: updateInnerData});
+
+        (bytes memory initData, IPluginSetup.PreparedSetupData memory prepared) =
+            pluginSetup.prepareUpdate(address(dao), 2, updatePayload);
+
+        assertTrue(initData.length > 0, "Should return init data for update");
+        assertEq(prepared.helpers.length, 1, "Should return a new VotingPowerCondition helper");
+        assertEq(prepared.permissions.length, 5, "Should return 5 permission changes (1 revoke and 4 grants)");
+    }
+
+    modifier givenAPluginIsBeingUninstalled() {
+        address[] memory helpers = new address[](1);
+        // Simulate a new token installation to get a helper address.
+        // The address itself is what matters for the uninstallation logic branch.
+        helpers[0] = address(governanceERC20Base);
+        vm.store(address(pluginSetup), bytes32(uint256(uint160(address(dao)))), bytes32(uint256(uint160(helpers[0]))));
+        _;
+    }
+
+    function test_WhenCallingPrepareUninstallation_returnsCorrectPermissions() external {
+        (, TokenVoting plugin,,) = new SimpleBuilder().build();
+        address pluginAddr = address(plugin);
+        address[] memory helpers = new address[](1);
+        helpers[0] = address(new GovernanceERC20(dao, "T", "T", defaultMintSettings));
+
+        IPluginSetup.SetupPayload memory payload =
+            IPluginSetup.SetupPayload({plugin: pluginAddr, currentHelpers: helpers, data: ""});
+
+        PermissionLib.MultiTargetPermission[] memory permissions =
+            pluginSetup.prepareUninstallation(address(dao), payload);
+
+        assertEq(permissions.length, 6, "Should return exactly 6 permissions to be revoked");
+
+        helpers[0] = address(new GovernanceWrappedERC20(IERC20Upgradeable(address(new ERC20Mock("", ""))), "WT", "WT"));
+        permissions = pluginSetup.prepareUninstallation(address(dao), payload);
+        assertEq(permissions.length, 6, "Should return exactly 6 permissions to be revoked");
+    }
+
+    modifier givenATokenContractThatImplementsTheIVotesInterfaceFunctions() {
+        // This modifier is intentionally left empty for clarity in test definitions.
+        _;
+    }
+
+    function test_WhenCallingSupportsIVotesInterfaceWithAnIVotesToken_returnsTrue() external {
+        (,, IVotesUpgradeable govToken,) = new SimpleBuilder().build();
+        assertTrue(pluginSetup.supportsIVotesInterface(address(govToken)));
+    }
+
+    modifier givenATokenContractThatDoesNotImplementTheIVotesInterfaceFunctions() {
+        // This modifier is intentionally left empty for clarity in test definitions.
+        _;
+    }
+
+    function test_WhenCallingSupportsIVotesInterfaceWithANonIVotesToken_returnsFalse() external {
+        ERC20Mock nonVotesToken = new ERC20Mock("Test", "TST");
+        assertFalse(pluginSetup.supportsIVotesInterface(address(nonVotesToken)));
+    }
+
+    // modifier givenTheInstallationParametersAreDefined() {
+    //     _;
+    // }
+
+    // function test_WhenCallingEncodeInstallationParametersWithTheParameters()
+    //     external
+    //     givenTheInstallationParametersAreDefined
+    // {
+    //     // It Should return the correct ABI-encoded byte representation
+    //     vm.skip(true);
+    // }
+
+    // function test_WhenCallingDecodeInstallationParametersWithTheEncodedData()
+    //     external
+    //     givenTheInstallationParametersAreDefined
+    // {
+    //     // It Should return the original installation parameters
+    //     vm.skip(true);
+    // }
+
+    // modifier givenTheInstallationRequestIsForANewToken() {
+    //     _;
+    // }
+
+    // function test_WhenCallingPrepareInstallation() external givenTheInstallationRequestIsForANewToken {
+    //     // It Should return exactly 7 permissions to be granted, including one for minting
+    //     vm.skip(true);
+    // }
+
+    // modifier givenTheInstallationRequestIsForAnExistingIVotescompliantToken() {
+    //     _;
+    // }
+
+    // function test_WhenCallingPrepareInstallation2()
+    //     external
+    //     givenTheInstallationRequestIsForAnExistingIVotescompliantToken
+    // {
+    //     // It Should return exactly 6 permissions to be granted and NOT deploy a new token
+    //     vm.skip(true);
+    // }
+
+    // modifier givenAPluginIsBeingUpdatedFromABuildVersionLessThan3() {
+    //     _;
+    // }
+
+    // function test_WhenCallingPrepareUpdateWithFromBuild2()
+    //     external
+    //     givenAPluginIsBeingUpdatedFromABuildVersionLessThan3
+    // {
+    //     // It Should return the initData for the update and a new VotingPowerCondition helper
+    //     // It Should return 5 permission changes (1 revoke and 4 grants)
+    //     vm.skip(true);
+    // }
+
+    // modifier givenAPluginIsBeingUninstalled() {
+    //     _;
+    // }
+
+    // function test_WhenCallingPrepareUninstallation() external givenAPluginIsBeingUninstalled {
+    //     // It Should return exactly 6 permissions to be revoked
+    //     vm.skip(true);
+    // }
+
+    // modifier givenATokenContractThatImplementsTheIVotesInterfaceFunctions() {
+    //     _;
+    // }
+
+    // function test_WhenCallingSupportsIVotesInterfaceWithTheTokensAddress()
+    //     external
+    //     givenATokenContractThatImplementsTheIVotesInterfaceFunctions
+    // {
+    //     // It Should return true
+    //     vm.skip(true);
+    // }
+
+    // modifier givenATokenContractThatDoesNotImplementTheIVotesInterfaceFunctions() {
+    //     _;
+    // }
+
+    // function test_WhenCallingSupportsIVotesInterfaceWithTheTokensAddress2()
+    //     external
+    //     givenATokenContractThatDoesNotImplementTheIVotesInterfaceFunctions
+    // {
+    //     // It Should return false
+    //     vm.skip(true);
+    // }
 }
