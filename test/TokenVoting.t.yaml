@@ -8,6 +8,18 @@ TokenVotingTest:
         then:
           - it: emits the `MembershipContractAnnounced` event
           - it: sets the voting settings, token, minimal approval and metadata
+      - given: An IVotes compatible token
+        and:
+          - when: The token indexes by block number
+            then:
+              - it: Should use block numbers for indexing
+          - when: The token indexes by timestamp
+            then:
+              - it: Should use timestamps for indexing
+          - when: The token does not report any clock data
+            then:
+              - it: Should assume a block number indexing
+
   - given: In the ERC-165 context
     and:
       - when: Calling supportsInterface('0xffffffff')
