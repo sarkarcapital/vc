@@ -36,7 +36,7 @@ contract GovernanceERC20 is
     /// @notice The permission identifier to mint new tokens
     bytes32 public constant MINT_PERMISSION_ID = keccak256("MINT_PERMISSION");
 
-    /// @notice Wether mint() has been permanently disabled
+    /// @notice Whether mint() has been permanently disabled.
     bool public mintingFrozen;
 
     /// @notice The settings for the initial mint of the token.
