@@ -1474,6 +1474,10 @@ contract TokenVotingTest is TestBase {
         assertTrue(plugin.isMinParticipationReached(proposalId));
     }
 
+    modifier givenExecutionCriteriaMultipleOrdersOfMagnitude() {
+        _;
+    }
+
     function _runMagnitudeTest(uint256 power) internal {
         uint256 baseUnit = 10 ** power;
         address[] memory holders = new address[](2);
@@ -1505,51 +1509,51 @@ contract TokenVotingTest is TestBase {
         assertTrue(plugin.canExecute(proposalId));
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_0() external {
+    function test_WhenTestingWithAMagnitudeOf100() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(0);
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_1() external {
+    function test_WhenTestingWithAMagnitudeOf101() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(1);
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_2() external {
+    function test_WhenTestingWithAMagnitudeOf102() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(2);
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_3() external {
+    function test_WhenTestingWithAMagnitudeOf103() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(3);
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_6() external {
+    function test_WhenTestingWithAMagnitudeOf106() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(6);
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_12() external {
+    function test_WhenTestingWithAMagnitudeOf1012() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(12);
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_18() external {
+    function test_WhenTestingWithAMagnitudeOf1018() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(18);
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_24() external {
+    function test_WhenTestingWithAMagnitudeOf1024() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(24);
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_36() external {
+    function test_WhenTestingWithAMagnitudeOf1036() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(36);
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_48() external {
+    function test_WhenTestingWithAMagnitudeOf1048() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(48);
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_60() external {
+    function test_WhenTestingWithAMagnitudeOf1060() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(60);
     }
 
-    function test_WhenTestingWithAMagnitudeOf10_66() external {
+    function test_WhenTestingWithAMagnitudeOf1066() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(66);
     }
 }

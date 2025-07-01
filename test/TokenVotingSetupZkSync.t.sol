@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {TestBase} from "./lib/TestBase.sol";
 
 import {SimpleBuilder} from "./builders/SimpleBuilder.sol";
-import {TokenVotingSetup as PluginSetupContract} from "../src/TokenVotingSetup.sol";
+import {TokenVotingSetupZkSync as PluginSetupContract} from "../src/TokenVotingSetupZkSync.sol";
 import {TokenVoting} from "../src/TokenVoting.sol";
 import {MajorityVotingBase} from "../src/base/MajorityVotingBase.sol";
 import {GovernanceERC20} from "../src/erc20/GovernanceERC20.sol";
@@ -18,7 +18,7 @@ import {IDAO} from "@aragon/osx-commons-contracts/src/dao/IDAO.sol";
 import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
-contract TokenVotingSetupTest is TestBase {
+contract TokenVotingSetupZkSyncTest is TestBase {
     // Permission IDs
     bytes32 constant UPDATE_VOTING_SETTINGS_PERMISSION_ID = keccak256("UPDATE_VOTING_SETTINGS_PERMISSION");
     bytes32 constant CREATE_PROPOSAL_PERMISSION_ID = keccak256("CREATE_PROPOSAL_PERMISSION");
@@ -46,14 +46,8 @@ contract TokenVotingSetupTest is TestBase {
         // Deploy DAO
         (dao,,,) = new SimpleBuilder().withDaoOwner(address(this)).build();
 
-        // Deploy base contracts
-        governanceERC20Base = new GovernanceERC20(
-            IDAO(address(0)), "G", "G", GovernanceERC20.MintSettings(new address[](0), new uint256[](0))
-        );
-        governanceWrappedERC20Base = new GovernanceWrappedERC20(IERC20Upgradeable(address(0x1)), "WG", "WG");
-
         // Deploy PluginSetup
-        pluginSetup = new PluginSetupContract(governanceERC20Base, governanceWrappedERC20Base);
+        pluginSetup = new PluginSetupContract();
 
         // Default settings
         defaultVotingSettings = MajorityVotingBase.VotingSettings({
@@ -99,12 +93,6 @@ contract TokenVotingSetupTest is TestBase {
     function test_WhenCallingSupportsInterface0xffffffff() external view {
         // It does not support the empty interface
         assertFalse(pluginSetup.supportsInterface(0xffffffff));
-    }
-
-    function test_WhenCallingGovernanceERC20BaseAndGovernanceWrappedERC20BaseAfterInitialization() external view {
-        // It stores the bases provided through the constructor
-        assertEq(pluginSetup.governanceERC20Base(), address(governanceERC20Base));
-        assertEq(pluginSetup.governanceWrappedERC20Base(), address(governanceWrappedERC20Base));
     }
 
     modifier givenTheContextIsPrepareInstallation() {
@@ -596,11 +584,6 @@ contract TokenVotingSetupTest is TestBase {
         bytes memory _metadata
     ) internal pure returns (bytes memory) {
         return abi.encode(_votingSettings, _tokenSettings, _mintSettings, _targetConfig, _minApproval, _metadata);
-    }
-
-    function test_whenCallingBasesAfterInitialization_itStoresTheBasesProvided() external view {
-        assertEq(pluginSetup.governanceERC20Base(), address(governanceERC20Base));
-        assertEq(pluginSetup.governanceWrappedERC20Base(), address(governanceWrappedERC20Base));
     }
 
     function test_failsIfDataIsEmptyOrNotOfMinLength() external givenTheContextIsPrepareInstallation {

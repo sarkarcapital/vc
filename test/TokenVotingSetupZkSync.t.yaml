@@ -1,4 +1,4 @@
-TokenVotingSetupTest:
+TokenVotingSetupZkSyncTest:
   - when: Calling supportsInterface('0xffffffff')
     then:
       - it: does not support the empty interface
