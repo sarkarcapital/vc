@@ -25,6 +25,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {ERC20ClockMock, ERC20NoClockMock} from "./mocks/ERC20ClockMock.sol";
 import {ProxyLib} from "@aragon/osx-commons-contracts/src/utils/deployment/ProxyLib.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract TokenVotingTest is TestBase {
     // Convenience aliases
@@ -180,6 +181,118 @@ contract TokenVotingTest is TestBase {
 
         (,, MajorityVotingBase.ProposalParameters memory parameters,,,,) = plugin.getProposal(proposalId);
         assertEq(parameters.snapshotTimepoint, 699);
+    }
+
+    function test_WhenCallingInitializeWithAListOfExcludedAccounts() external givenInTheInitializeContext {
+        // It Should correctly add all provided addresses to the excludedAccounts set
+        // It Should allow an empty list of excluded accounts
+
+        address[] memory holders = new address[](2);
+        holders[0] = alice;
+        holders[1] = bob;
+        address[] memory excluded = new address[](1);
+        excluded[0] = alice;
+
+        uint256 proposalId;
+
+        {
+            // Simple flow
+            (dao, plugin, token,) = new SimpleBuilder().withNewToken(holders, 10 ether).withExcludedAccount(alice)
+                .withEarlyExecution().withMinApprovals(1_000_000)
+                // 100% approvals required
+                .build();
+            dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
+            dao.grant(address(plugin), bob, plugin.EXECUTE_PROPOSAL_PERMISSION_ID());
+
+            vm.prank(alice);
+            proposalId = plugin.createProposal("", new Action[](0), 0, 0, bytes(""));
+
+            vm.prank(bob);
+            plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, true);
+
+            (bool open, bool executed,,,,,) = plugin.getProposal(proposalId);
+            assertFalse(open);
+            assertTrue(executed);
+        }
+
+        // Manually initializing a plugin fork (to read minApprovals)
+        {
+            address base = address(new MyTokenVoting());
+            (dao,, token,) = new SimpleBuilder().withNewToken(holders, 10 ether).withExcludedAccount(alice).build();
+
+            address proxy = ProxyLib.deployUUPSProxy(base, "");
+            MyTokenVoting myPlugin = MyTokenVoting(proxy);
+            MajorityVotingBase.VotingSettings memory settings = MajorityVotingBase.VotingSettings({
+                votingMode: MajorityVotingBase.VotingMode.EarlyExecution,
+                supportThreshold: 400_000, // 40%
+                minParticipation: 200_000, // 20%
+                minDuration: ONE_DAY,
+                minProposerVotingPower: 0
+            });
+            uint256 minApprovals = 1_000_000; // 100%
+            bytes memory metadata = "";
+
+            myPlugin.initialize(
+                dao,
+                settings,
+                token,
+                IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call),
+                minApprovals,
+                metadata,
+                excluded
+            );
+
+            dao.grant(address(myPlugin), alice, myPlugin.CREATE_PROPOSAL_PERMISSION_ID());
+
+            vm.prank(alice);
+            proposalId = myPlugin.createProposal("", new Action[](0), 0, 0, bytes(""));
+
+            assertEq(myPlugin.getProposalMinApprovals(proposalId), 10 ether);
+        }
+    }
+
+    function test_WhenCallingInitializeWithDuplicateAddressesInTheExcludedAccountsList()
+        external
+        givenInTheInitializeContext
+    {
+        // It Should store each address only once in the excludedAccounts set
+
+        address[] memory holders = new address[](2);
+        holders[0] = alice;
+        holders[1] = bob;
+        address[] memory excluded = new address[](5);
+        excluded[0] = alice;
+        excluded[1] = alice;
+        excluded[2] = alice;
+        excluded[3] = alice;
+        excluded[4] = alice;
+
+        address base = address(new MyTokenVoting());
+        (dao,, token,) = new SimpleBuilder().withNewToken(holders, 10 ether).withExcludedAccount(alice).build();
+
+        address proxy = ProxyLib.deployUUPSProxy(base, "");
+        MyTokenVoting myPlugin = MyTokenVoting(proxy);
+        MajorityVotingBase.VotingSettings memory settings = MajorityVotingBase.VotingSettings({
+            votingMode: MajorityVotingBase.VotingMode.EarlyExecution,
+            supportThreshold: 400_000, // 40%
+            minParticipation: 200_000, // 20%
+            minDuration: ONE_DAY,
+            minProposerVotingPower: 0
+        });
+        uint256 minApprovals = 1_000_000; // 100%
+        bytes memory metadata = "";
+
+        myPlugin.initialize(
+            dao,
+            settings,
+            token,
+            IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call),
+            minApprovals,
+            metadata,
+            excluded
+        );
+
+        assertEq(myPlugin.excludedAccountsLength(), 1);
     }
 
     modifier givenInTheERC165Context() {
