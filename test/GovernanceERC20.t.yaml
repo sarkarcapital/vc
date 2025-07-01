@@ -205,3 +205,32 @@ GovernanceERC20Test:
                       - it: "`to` has the correct voting power"
                       - it: "`to`s delegate is correctly changed"
                       - it: "`to`s delegate has the correct voting power"
+
+  - given: Minting is allowed
+    and:
+      - given: Calling mint() with the permission
+        then:
+          - it: Should mint properly
+      - given: Calling mint() without the permission
+        then:
+          - it: Should revert
+      - given: Calling freezeMinting() with the permission
+        then:
+          - it: Should disallow mints from then on
+      - given: Calling freezeMinting() without the permission
+        then:
+          - it: Should revert
+  - given: Minting is frozen
+    and:
+      - given: Calling mint() with the permission
+        then:
+          - it: Should revert
+      - given: Calling mint() without the permission
+        then:
+          - it: Should revert
+      - given: Calling freezeMinting() with the permission
+        then:
+          - it: Should do nothing
+      - given: Calling freezeMinting() without the permission
+        then:
+          - it: Should revert

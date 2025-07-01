@@ -58,71 +58,89 @@ GovernanceERC20Test
 │   │   └── It updates voting power after transfer for `from` if delegation turned on
 │   └── When Transferring tokens to an address with delegation turned on
 │       └── It updates voting power after transfer for `to` if delegation turned on
-└── Given A token is deployed and the main signer can mint 2 // afterTokenTransfer - exhaustive tests
-    ├── Given The to address has a zero balance
-    │   ├── Given The to address has delegated to other
-    │   │   ├── When The to address receives tokens via mint
-    │   │   │   ├── It `to` has the correct voting power
-    │   │   │   ├── It `to`s delegate has not changed
-    │   │   │   └── It `to`s delegate has the correct voting power
-    │   │   └── When The to address receives tokens via transfer from from
-    │   │       ├── It `from` has the correct voting power
-    │   │       ├── It `from`s delegate has not changed
-    │   │       ├── It `from`s delegate has the correct voting power
-    │   │       ├── It `to` has the correct voting power
-    │   │       ├── It `to`s delegate has not changed
-    │   │       └── It `to`s delegate has the correct voting power
-    │   └── Given The to address has not delegated before
-    │       ├── When The to address receives tokens via mint 2
-    │       │   ├── It `to` has the correct voting power
-    │       │   ├── It `to`s delegate has not changed
-    │       │   └── It `to`s delegate has the correct voting power
-    │       └── When The to address receives tokens via transfer from from 2
-    │           ├── It `from` has the correct voting power
-    │           ├── It `from`s delegate has not changed
-    │           ├── It `from`s delegate has the correct voting power
-    │           ├── It `to` has the correct voting power
-    │           ├── It `to`s delegate has not changed
-    │           └── It `to`s delegate has the correct voting power
-    └── Given The to address has a nonzero balance
-        ├── Given The to address has delegated to other 2
-        │   ├── When The to address receives tokens via mint 3
-        │   │   ├── When The to address then transfers to other
-        │   │   │   ├── It `to` has the correct voting power
-        │   │   │   ├── It `to`s delegate has not changed
-        │   │   │   └── It `to`s delegate has the correct voting power
-        │   │   └── When The to address then delegates to other again
-        │   │       ├── It `to` has the correct voting power
-        │   │       ├── It `to`s delegate is correctly changed
-        │   │       └── It `to`s delegate has the correct voting power
-        │   └── When The to address receives tokens via transfer from from 3
-        │       ├── When The to address then transfers to other 2
-        │       │   ├── It `to` has the correct voting power
-        │       │   ├── It `to`s delegate has not changed
-        │       │   └── It `to`s delegate has the correct voting power
-        │       └── When The to address then delegates to other again 2
-        │           ├── It `to` has the correct voting power
-        │           ├── It `to`s delegate is correctly changed
-        │           └── It `to`s delegate has the correct voting power
-        └── Given The to address has not delegated before 2
-            ├── When The to address receives tokens via mint 4
-            │   ├── When The to address then transfers to other 3
-            │   │   ├── It `to` has the correct voting power
-            │   │   ├── It `to`s delegate has not changed
-            │   │   └── It `to`s delegate has the correct voting power
-            │   └── When The to address then delegates to other
-            │       ├── It `to` has the correct voting power
-            │       ├── It `to`s delegate is correctly changed
-            │       └── It `to`s delegate has the correct voting power
-            └── When The to address receives tokens via transfer from from 4
-                ├── When The to address then transfers to other 4
-                │   ├── It `to` has the correct voting power
-                │   ├── It `to`s delegate has not changed
-                │   └── It `to`s delegate has the correct voting power
-                └── When The to address then delegates to other 2
-                    ├── It `to` has the correct voting power
-                    ├── It `to`s delegate is correctly changed
-                    └── It `to`s delegate has the correct voting power
+├── Given A token is deployed and the main signer can mint 2 // afterTokenTransfer - exhaustive tests
+│   ├── Given The to address has a zero balance
+│   │   ├── Given The to address has delegated to other
+│   │   │   ├── When The to address receives tokens via mint
+│   │   │   │   ├── It `to` has the correct voting power
+│   │   │   │   ├── It `to`s delegate has not changed
+│   │   │   │   └── It `to`s delegate has the correct voting power
+│   │   │   └── When The to address receives tokens via transfer from from
+│   │   │       ├── It `from` has the correct voting power
+│   │   │       ├── It `from`s delegate has not changed
+│   │   │       ├── It `from`s delegate has the correct voting power
+│   │   │       ├── It `to` has the correct voting power
+│   │   │       ├── It `to`s delegate has not changed
+│   │   │       └── It `to`s delegate has the correct voting power
+│   │   └── Given The to address has not delegated before
+│   │       ├── When The to address receives tokens via mint 2
+│   │       │   ├── It `to` has the correct voting power
+│   │       │   ├── It `to`s delegate has not changed
+│   │       │   └── It `to`s delegate has the correct voting power
+│   │       └── When The to address receives tokens via transfer from from 2
+│   │           ├── It `from` has the correct voting power
+│   │           ├── It `from`s delegate has not changed
+│   │           ├── It `from`s delegate has the correct voting power
+│   │           ├── It `to` has the correct voting power
+│   │           ├── It `to`s delegate has not changed
+│   │           └── It `to`s delegate has the correct voting power
+│   └── Given The to address has a nonzero balance
+│       ├── Given The to address has delegated to other 2
+│       │   ├── When The to address receives tokens via mint 3
+│       │   │   ├── When The to address then transfers to other
+│       │   │   │   ├── It `to` has the correct voting power
+│       │   │   │   ├── It `to`s delegate has not changed
+│       │   │   │   └── It `to`s delegate has the correct voting power
+│       │   │   └── When The to address then delegates to other again
+│       │   │       ├── It `to` has the correct voting power
+│       │   │       ├── It `to`s delegate is correctly changed
+│       │   │       └── It `to`s delegate has the correct voting power
+│       │   └── When The to address receives tokens via transfer from from 3
+│       │       ├── When The to address then transfers to other 2
+│       │       │   ├── It `to` has the correct voting power
+│       │       │   ├── It `to`s delegate has not changed
+│       │       │   └── It `to`s delegate has the correct voting power
+│       │       └── When The to address then delegates to other again 2
+│       │           ├── It `to` has the correct voting power
+│       │           ├── It `to`s delegate is correctly changed
+│       │           └── It `to`s delegate has the correct voting power
+│       └── Given The to address has not delegated before 2
+│           ├── When The to address receives tokens via mint 4
+│           │   ├── When The to address then transfers to other 3
+│           │   │   ├── It `to` has the correct voting power
+│           │   │   ├── It `to`s delegate has not changed
+│           │   │   └── It `to`s delegate has the correct voting power
+│           │   └── When The to address then delegates to other
+│           │       ├── It `to` has the correct voting power
+│           │       ├── It `to`s delegate is correctly changed
+│           │       └── It `to`s delegate has the correct voting power
+│           └── When The to address receives tokens via transfer from from 4
+│               ├── When The to address then transfers to other 4
+│               │   ├── It `to` has the correct voting power
+│               │   ├── It `to`s delegate has not changed
+│               │   └── It `to`s delegate has the correct voting power
+│               └── When The to address then delegates to other 2
+│                   ├── It `to` has the correct voting power
+│                   ├── It `to`s delegate is correctly changed
+│                   └── It `to`s delegate has the correct voting power
+├── Given Minting is allowed
+│   ├── Given Calling mint with the permission
+│   │   └── It Should mint properly
+│   ├── Given Calling mint without the permission
+│   │   └── It Should revert
+│   ├── Given Calling freezeMinting with the permission
+│   │   └── It Should disallow mints from then on
+│   └── Given Calling freezeMinting without the permission
+│       └── It Should revert
+└── Given Minting is frozen
+    ├── Given Calling mint with the permission 2
+    │   └── It Should revert
+    ├── Given Calling mint without the permission 2
+    │   └── It Should revert
+    ├── Given Calling freezeMinting with the permission 2
+    │   └── It Should do nothing
+    └── Given Calling freezeMinting without the permission 2
+        └── It Should revert
 ```
 ```
 GovernanceWrappedERC20Test
