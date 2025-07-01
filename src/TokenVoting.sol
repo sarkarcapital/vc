@@ -14,13 +14,14 @@ import {IProposal} from "@aragon/osx-commons-contracts/src/plugin/extensions/pro
 import {Action} from "@aragon/osx-commons-contracts/src/executors/IExecutor.sol";
 
 import {MajorityVotingBase} from "./base/MajorityVotingBase.sol";
+import {IERC6372Upgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC6372Upgradeable.sol";
 
 /// @title TokenVoting
-/// @author Aragon X - 2021-2024
+/// @author Aragon X - 2021-2025
 /// @notice The majority voting implementation using an
 ///         [OpenZeppelin `Votes`](https://docs.openzeppelin.com/contracts/4.x/api/governance#Votes)
 ///         compatible governance token.
-/// @dev v1.3 (Release 1, Build 3). For each upgrade, if the reinitialization step is required,
+/// @dev v1.4 (Release 1, Build 4). For each upgrade, if the reinitialization step is required,
 ///      increment the version numbers in the modifier for both the initialize and initializeFrom functions.
 /// @custom:security-contact sirt@aragon.org
 contract TokenVoting is IMembership, MajorityVotingBase {
@@ -33,14 +34,23 @@ contract TokenVoting is IMembership, MajorityVotingBase {
     ///         compatible contract referencing the token being used for voting.
     IVotesUpgradeable private votingToken;
 
+    /// @notice Wether the token contract indexes past voting power by timestamp.
+    bool private tokenIndexedByTimestamp;
+
     /// @notice Thrown if the voting power is zero
     error NoVotingPower();
+
+    /// @notice Thrown if the token reports an inconsistent clock mode and clock value
+    error TokenClockMismatch();
 
     /// @notice Initializes the component.
     /// @dev This method is required to support [ERC-1822](https://eips.ethereum.org/EIPS/eip-1822).
     /// @param _dao The IDAO interface of the associated DAO.
     /// @param _votingSettings The voting settings.
-    /// @param _token The [ERC-20](https://eips.ethereum.org/EIPS/eip-20) token used for voting.
+    /// @param _token The [ERC-20](https://eips.ethereum.org/EIPS/eip-20) token to use for voting.
+    ///     If the given token implements https://eips.ethereum.org/EIPS/eip-6372,
+    ///     then `CLOCK_MODE()` or `clock()` will determine the clock type used by the plugin.
+    ///     The token will be assumed to use a block number based clock otherwise.
     /// @param _targetConfig Configuration for the execution target, specifying the target address and operation type
     ///     (either `Call` or `DelegateCall`). Defined by `TargetConfig` in the `IPlugin` interface,
     ///     part of the `osx-commons-contracts` package, added in build 3.
@@ -54,10 +64,12 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         TargetConfig calldata _targetConfig,
         uint256 _minApprovals,
         bytes calldata _pluginMetadata
-    ) external onlyCallAtInitialization reinitializer(2) {
+    ) external onlyCallAtInitialization reinitializer(3) {
         __MajorityVotingBase_init(_dao, _votingSettings, _targetConfig, _minApprovals, _pluginMetadata);
 
         votingToken = _token;
+
+        _detectTokenClock();
 
         emit MembershipContractAnnounced({definingContract: address(_token)});
     }
@@ -70,7 +82,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
     /// @param _fromBuild Build version number of previous implementation contract this upgrade is transitioning from.
     /// @param _initData The initialization data to be passed to via `upgradeToAndCall`
     ///     (see [ERC-1967](https://docs.openzeppelin.com/contracts/4.x/api/proxy#ERC1967Upgrade)).
-    function initializeFrom(uint16 _fromBuild, bytes calldata _initData) external reinitializer(2) {
+    function initializeFrom(uint16 _fromBuild, bytes calldata _initData) external reinitializer(3) {
         if (_fromBuild < 3) {
             (uint256 minApprovals, TargetConfig memory targetConfig, bytes memory pluginMetadata) =
                 abi.decode(_initData, (uint256, TargetConfig, bytes));
@@ -80,6 +92,9 @@ contract TokenVoting is IMembership, MajorityVotingBase {
             _setTargetConfig(targetConfig);
 
             _setMetadata(pluginMetadata);
+        }
+        if (_fromBuild < 4) {
+            _detectTokenClock();
         }
     }
 
@@ -115,14 +130,18 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         VoteOption _voteOption,
         bool _tryEarlyExecution
     ) public override auth(CREATE_PROPOSAL_PERMISSION_ID) returns (uint256 proposalId) {
-        uint256 snapshotBlock;
+        uint256 snapshotTimepoint;
         unchecked {
-            // The snapshot block must be mined already to
-            // protect the transaction against backrunning transactions causing census changes.
-            snapshotBlock = block.number - 1;
+            // The time point must be already mined (block) or in the past (timestamp) to
+            // protect against backrunning transactions causing census changes.
+            if (tokenIndexedByTimestamp) {
+                snapshotTimepoint = block.timestamp - 1;
+            } else {
+                snapshotTimepoint = block.number - 1;
+            }
         }
 
-        uint256 totalVotingPower_ = totalVotingPower(snapshotBlock);
+        uint256 totalVotingPower_ = totalVotingPower(snapshotTimepoint);
 
         if (totalVotingPower_ == 0) {
             revert NoVotingPower();
@@ -135,13 +154,13 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         // Store proposal related information
         Proposal storage proposal_ = proposals[proposalId];
 
-        if (proposal_.parameters.snapshotBlock != 0) {
+        if (proposal_.parameters.snapshotTimepoint != 0) {
             revert ProposalAlreadyExists(proposalId);
         }
 
         proposal_.parameters.startDate = _startDate;
         proposal_.parameters.endDate = _endDate;
-        proposal_.parameters.snapshotBlock = snapshotBlock.toUint64();
+        proposal_.parameters.snapshotTimepoint = snapshotTimepoint.toUint64();
         proposal_.parameters.votingMode = votingMode();
         proposal_.parameters.supportThreshold = supportThreshold();
         proposal_.parameters.minVotingPower = _applyRatioCeiled(totalVotingPower_, minParticipation());
@@ -209,7 +228,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         Proposal storage proposal_ = proposals[_proposalId];
 
         // This could re-enter, though we can assume the governance token is not malicious
-        uint256 votingPower = votingToken.getPastVotes(_voter, proposal_.parameters.snapshotBlock);
+        uint256 votingPower = votingToken.getPastVotes(_voter, proposal_.parameters.snapshotTimepoint);
         VoteOption state = proposal_.voters[_voter];
 
         // If voter had previously voted, decrease count
@@ -266,7 +285,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         }
 
         // The voter has no voting power.
-        if (votingToken.getPastVotes(_account, proposal_.parameters.snapshotBlock) == 0) {
+        if (votingToken.getPastVotes(_account, proposal_.parameters.snapshotTimepoint) == 0) {
             return false;
         }
 
@@ -279,6 +298,27 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         }
 
         return true;
+    }
+
+    /// @dev Helper function to identify the clock mode used by the given voting token.
+    function _detectTokenClock() private {
+        bool clockModeTimestamp;
+        bool clockTimestamp;
+
+        try IERC6372Upgradeable(address(votingToken)).CLOCK_MODE() returns (string memory clockMode) {
+            clockModeTimestamp = keccak256(bytes(clockMode)) == keccak256(bytes("mode=timestamp"));
+        } catch {}
+        try IERC6372Upgradeable(address(votingToken)).clock() returns (uint48 timePoint) {
+            clockTimestamp = (timePoint == block.timestamp);
+        } catch {}
+
+        if (clockModeTimestamp != clockTimestamp) {
+            revert TokenClockMismatch();
+        } else if (clockModeTimestamp) {
+            tokenIndexedByTimestamp = true;
+        } else {
+            // Assuming that the token indexes by block number
+        }
     }
 
     /// @dev Helper function to avoid stack too deep in non via-ir compilation mode.

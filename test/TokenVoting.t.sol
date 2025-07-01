@@ -23,6 +23,7 @@ import {
     ERC165Upgradeable,
     IERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {ERC20ClockMock, ERC20NoClockMock} from "./mocks/ERC20ClockMock.sol";
 import {ProxyLib} from "@aragon/osx-commons-contracts/src/utils/deployment/ProxyLib.sol";
 
 contract TokenVotingTest is TestBase {
@@ -30,7 +31,7 @@ contract TokenVotingTest is TestBase {
     uint64 constant ONE_HOUR = 3600;
     uint64 constant ONE_DAY = 24 * ONE_HOUR;
     uint32 constant RATIO_BASE = 1_000_000;
-    uint256 constant PID_1 = 24442852706930026813960589198787161940723350201292828222811205541589223307271;
+    uint256 constant PID_1 = 39687166011226163736142959723276339618578320575274405595170535908768147234362;
     bytes32 public constant SET_TARGET_CONFIG_PERMISSION_ID = keccak256("SET_TARGET_CONFIG_PERMISSION");
 
     DAO dao;
@@ -102,6 +103,76 @@ contract TokenVotingTest is TestBase {
         assertEq(plugin.minProposerVotingPower(), settings.minProposerVotingPower);
         assertEq(address(plugin.getVotingToken()), address(token));
         assertEq(plugin.minApproval(), minApprovals);
+    }
+
+    modifier givenAnIVotesCompatibleToken() {
+        (dao, plugin, token,) = new SimpleBuilder().build();
+        dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
+
+        _;
+    }
+
+    function test_WhenTheTokenIndexesByBlockNumber()
+        external
+        givenInTheInitializeContext
+        givenAnIVotesCompatibleToken
+    {
+        // It Should use block numbers for indexing
+        vm.prank(alice);
+        uint256 proposalId = plugin.createProposal("", new Action[](0), 0, 0, bytes(""));
+
+        (,, MajorityVotingBase.ProposalParameters memory parameters,,,,) = plugin.getProposal(proposalId);
+        assertEq(parameters.snapshotTimepoint, block.number - 1);
+
+        // 2
+
+        ERC20ClockMock tok = new ERC20ClockMock(false);
+
+        (dao, plugin, token,) = new SimpleBuilder().withToken(IVotesUpgradeable(address(tok))).build();
+        dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
+
+        vm.roll(500);
+        vm.prank(alice);
+        proposalId = plugin.createProposal("", new Action[](0), 0, 0, bytes(""));
+
+        (,, parameters,,,,) = plugin.getProposal(proposalId);
+        assertEq(parameters.snapshotTimepoint, 499);
+    }
+
+    function test_WhenTheTokenIndexesByTimestamp() external givenInTheInitializeContext givenAnIVotesCompatibleToken {
+        // It Should use timestamps for indexing
+
+        ERC20ClockMock tok = new ERC20ClockMock(true);
+
+        (dao, plugin, token,) = new SimpleBuilder().withToken(IVotesUpgradeable(address(tok))).build();
+        dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
+
+        vm.warp(500000);
+        vm.prank(alice);
+        uint256 proposalId = plugin.createProposal("", new Action[](0), 0, 0, bytes(""));
+
+        (,, MajorityVotingBase.ProposalParameters memory parameters,,,,) = plugin.getProposal(proposalId);
+        assertEq(parameters.snapshotTimepoint, 499999);
+    }
+
+    function test_WhenTheTokenDoesNotReportAnyClockData()
+        external
+        givenInTheInitializeContext
+        givenAnIVotesCompatibleToken
+    {
+        // It Should assume a block number indexing
+
+        ERC20NoClockMock tok = new ERC20NoClockMock();
+
+        (dao, plugin, token,) = new SimpleBuilder().withToken(IVotesUpgradeable(address(tok))).build();
+        dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
+
+        vm.roll(700);
+        vm.prank(alice);
+        uint256 proposalId = plugin.createProposal("", new Action[](0), 0, 0, bytes(""));
+
+        (,, MajorityVotingBase.ProposalParameters memory parameters,,,,) = plugin.getProposal(proposalId);
+        assertEq(parameters.snapshotTimepoint, 699);
     }
 
     modifier givenInTheERC165Context() {

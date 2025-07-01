@@ -16,12 +16,16 @@ contract TestBase is Test {
     address immutable randomAddress = vm.addr(1234567890);
 
     constructor() {
+        vm.roll(10);
+        vm.warp(100_000);
+
         vm.label(alice, "Alice");
         vm.label(bob, "Bob");
         vm.label(carol, "Carol");
         vm.label(david, "David");
         vm.label(randomAddress, "Random wallet");
 
+        // Assume that we are testing on Sepolia (used to compute proposal ID's)
         vm.chainId(11155111);
     }
 

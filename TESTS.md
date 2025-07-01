@@ -341,9 +341,16 @@ TokenVotingTest
 ├── Given In the initialize context
 │   ├── When Calling initialize on an already initialized plugin
 │   │   └── It reverts if trying to re-initialize
-│   └── When Calling initialize on an uninitialized plugin
-│       ├── It emits the `MembershipContractAnnounced` event
-│       └── It sets the voting settings, token, minimal approval and metadata
+│   ├── When Calling initialize on an uninitialized plugin
+│   │   ├── It emits the `MembershipContractAnnounced` event
+│   │   └── It sets the voting settings, token, minimal approval and metadata
+│   └── Given An IVotes compatible token
+│       ├── When The token indexes by block number
+│       │   └── It Should use block numbers for indexing
+│       ├── When The token indexes by timestamp
+│       │   └── It Should use timestamps for indexing
+│       └── When The token does not report any clock data
+│           └── It Should assume a block number indexing
 ├── Given In the ERC165 context
 │   ├── When Calling supportsInterface0xffffffff
 │   │   └── It does not support the empty interface
