@@ -76,7 +76,7 @@ contract PluginSetupForkTest is ForkTestBase {
             uint256[] memory amounts = new uint256[](1);
             amounts[0] = 100 ether;
             GovernanceERC20.MintSettings memory initialMint = GovernanceERC20.MintSettings(receivers, amounts);
-            existingToken = new GovernanceERC20(dao, "Existing Token", "EXIST", initialMint);
+            existingToken = new GovernanceERC20(dao, "Existing Token", "EXIST", initialMint, new address[](0));
         }
 
         // PERMISSIONS: Grant the necessary permissions to the PluginSetupProcessor
@@ -101,7 +101,9 @@ contract PluginSetupForkTest is ForkTestBase {
                 GovernanceERC20.MintSettings(new address[](0), new uint256[](0));
             IPlugin.TargetConfig memory targetConfig = IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call);
 
-            installData = abi.encode(votingSettings, tokenSettings, emptyMintSettings, targetConfig, 0, "some-metadata");
+            installData = abi.encode(
+                votingSettings, tokenSettings, emptyMintSettings, targetConfig, 0, "some-metadata", new address[](0)
+            );
         }
 
         // Prepare and apply the installation

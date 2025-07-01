@@ -64,7 +64,8 @@ contract TokenVotingTest is TestBase {
             token,
             IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call),
             0,
-            ""
+            "",
+            new address[](0)
         );
     }
 
@@ -92,7 +93,13 @@ contract TokenVotingTest is TestBase {
         emit IMembership.MembershipContractAnnounced(address(token));
 
         plugin.initialize(
-            dao, settings, token, IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call), minApprovals, metadata
+            dao,
+            settings,
+            token,
+            IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call),
+            minApprovals,
+            metadata,
+            new address[](0)
         );
 
         // THEN it sets the voting settings, token, minimal approval and metadata
