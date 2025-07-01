@@ -1,5 +1,5 @@
 GovernanceERC20Test:
-  - given: The contract is deployed with default mint settings
+  - given: The contract is being deployed with default mint settings
     and:
       - when: Calling initialize() again
         then:
@@ -13,6 +13,21 @@ GovernanceERC20Test:
       - when: Deploying with mismatched receivers and amounts arrays
         then:
           - it: reverts if the `receivers` and `amounts` array lengths in the mint settings mismatch
+
+      - when: Calling initialize() with a list of accounts to be self-delegated
+        then:
+          - it: Should successfully initialize the token
+          - it: Should call _delegate for each specified account to itself
+          - it: Should ensure each specified account has a vote checkpoint created at initialization
+      - when: Calling initialize() with an empty list of accounts for self-delegation
+        then:
+          - it: Should initialize successfully without performing any initial self-delegations
+      - when: Calling initialize() with address(0) in the list of accounts to be self-delegated
+        then:
+          - it: Should revert with CannotSelfDelegateAddress0()
+      - when: Calling initialize() with duplicate addresses in the list of accounts to be self-delegated
+        then:
+          - it: Should self-delegate the address once and initialize successfully
 
   - given: The contract is deployed
     comment: "ERC-165"

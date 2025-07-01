@@ -19,6 +19,20 @@ TokenVotingTest:
           - when: The token does not report any clock data
             then:
               - it: Should assume a block number indexing
+      - when: Calling initialize() with a list of excluded accounts
+        then:
+          - it: Should correctly add all provided addresses to the excludedAccounts set
+          - it: Should allow an empty list of excluded accounts
+      - when: Calling initialize() with duplicate addresses in the excluded accounts list
+        then:
+          - it: Should store each address only once in the excludedAccounts set
+  - given: The plugin has been upgraded from a version before build 4
+    and:
+      - when: Calling initializeFrom() with _fromBuild < 4
+        then:
+          - it: Should not initialize or modify the excludedAccounts set
+          - it: Should leave the excludedAccounts set empty
+          - comment: This ensures that the excluded supply cannot be changed during an upgrade, which could break governance invariants.
 
   - given: In the ERC-165 context
     and:
@@ -71,6 +85,35 @@ TokenVotingTest:
       - when: Creating a proposal with empty data
         then:
           - it: creates proposal with default values if `data` param is passed as empty
+
+  - given: Account exclusion
+    and:
+      - when: Calling totalVotingPower() with no accounts in the excluded list
+        then:
+          - it: Should return the token's past total supply minus the past votes of the DAO at the given timepoint
+      - when: Calling totalVotingPower() with one account in the excluded list
+        and:
+          - given: The excluded account has voting power at the given timepoint
+            then:
+              - it: Should return the token's past total supply minus the past votes of the DAO and the excluded account
+          - when: Creating a proposal
+            and:
+              - given: The total voting power after excluding accounts is greater than 0
+                then:
+                  - it: Should create the proposal successfully
+                  - it: Should calculate minVotingPower based on the effective total voting power (after exclusions)
+                  - it: Should calculate minApprovalPower based on the effective total voting power (after exclusions)
+              - given: The total voting power after excluding accounts is 0
+                then:
+                  - it: Should revert with NoVotingPower()
+
+      - when: Calling totalVotingPower() with multiple accounts in the excluded list
+        then:
+          - it: Should correctly subtract the past votes of all excluded accounts (including the DAO) from the past total supply
+      - when: Calling totalVotingPower() with an excluded account that has zero voting power at the timepoint
+        then:
+          - it: Should produce the same result as if the account was not excluded
+
   - given: In the Proposal creation context
     and:
       - given: minProposerVotingPower == 0
