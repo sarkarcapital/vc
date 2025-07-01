@@ -64,8 +64,15 @@ contract GovernanceERC20 is
     /// @param _name The name of the [ERC-20](https://eips.ethereum.org/EIPS/eip-20) governance token.
     /// @param _symbol The symbol of the [ERC-20](https://eips.ethereum.org/EIPS/eip-20) governance token.
     /// @param _mintSettings The token mint settings struct containing the `receivers` and `amounts`.
-    constructor(IDAO _dao, string memory _name, string memory _symbol, MintSettings memory _mintSettings) {
-        initialize(_dao, _name, _symbol, _mintSettings);
+    /// @param _selfDelegatedAccounts An optional list of addresses where self delegation is expected. Use this for addresses where balance needs to be excluded from the supply.
+    constructor(
+        IDAO _dao,
+        string memory _name,
+        string memory _symbol,
+        MintSettings memory _mintSettings,
+        address[] memory _selfDelegatedAccounts
+    ) {
+        initialize(_dao, _name, _symbol, _mintSettings, _selfDelegatedAccounts);
     }
 
     /// @notice Initializes the contract and mints tokens to a list of receivers.
@@ -73,10 +80,14 @@ contract GovernanceERC20 is
     /// @param _name The name of the [ERC-20](https://eips.ethereum.org/EIPS/eip-20) governance token.
     /// @param _symbol The symbol of the [ERC-20](https://eips.ethereum.org/EIPS/eip-20) governance token.
     /// @param _mintSettings The token mint settings struct containing the `receivers` and `amounts`.
-    function initialize(IDAO _dao, string memory _name, string memory _symbol, MintSettings memory _mintSettings)
-        public
-        initializer
-    {
+    /// @param _selfDelegatedAccounts An optional list of addresses where self delegation is expected. Use this for addresses where balance needs to be excluded from the supply.
+    function initialize(
+        IDAO _dao,
+        string memory _name,
+        string memory _symbol,
+        MintSettings memory _mintSettings,
+        address[] memory _selfDelegatedAccounts
+    ) public initializer {
         // Check mint settings
         if (_mintSettings.receivers.length != _mintSettings.amounts.length) {
             revert MintSettingsArrayLengthMismatch({
@@ -88,6 +99,17 @@ contract GovernanceERC20 is
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
         __DaoAuthorizableUpgradeable_init(_dao);
+
+        // @dev Self delegating the given addresses before any minting happens
+        //      To exclude these accounts from the circulating supply, the plugin needs the token to track their past voting power.
+        //      Otherwise, there will be no way of subtracting their voting power from getPastTotalSupply(...)
+        for (uint256 i; i < _selfDelegatedAccounts.length;) {
+            _delegate(_selfDelegatedAccounts[i], _selfDelegatedAccounts[i]);
+
+            unchecked {
+                ++i;
+            }
+        }
 
         for (uint256 i; i < _mintSettings.receivers.length;) {
             _mint(_mintSettings.receivers[i], _mintSettings.amounts[i]);
