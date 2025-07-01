@@ -135,9 +135,6 @@ contract TokenVoting is IMembership, MajorityVotingBase {
     /// @return The effective voting power.
     function totalVotingPower(uint256 _timePoint) public view override returns (uint256) {
         uint256 _excludedSupply;
-        if (!excludedAccounts.contains(address(0))) {
-            _excludedSupply += votingToken.getPastVotes(address(0), _timePoint);
-        }
         for (uint256 i; i < excludedAccounts.length();) {
             _excludedSupply += votingToken.getPastVotes(excludedAccounts.at(i), _timePoint);
 

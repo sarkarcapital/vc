@@ -2,10 +2,6 @@ TokenVotingSetupZkSyncTest:
   - when: Calling supportsInterface('0xffffffff')
     then:
       - it: does not support the empty interface
-  - when: Calling governanceERC20Base() and governanceWrappedERC20Base() after initialization
-    comment: This test is skipped if the network is ZkSync
-    then:
-      - it: stores the bases provided through the constructor
   - given: The context is prepareInstallation
     and:
       - when: Calling prepareInstallation with data that is empty or not of minimum length
@@ -88,7 +84,6 @@ TokenVotingSetupZkSyncTest:
           - it: Should return the original installation parameters
 
   - given: The installation request is for a new token
-    comment: The token address in TokenSettings is address(0)
     and:
       - when: Calling prepareInstallation()
         then:

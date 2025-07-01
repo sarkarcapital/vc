@@ -31,8 +31,8 @@ TokenVotingTest:
       - when: Calling initializeFrom() with _fromBuild < 4
         then:
           - it: Should not initialize or modify the excludedAccounts set
+            comment: This ensures that the excluded supply cannot be changed during an upgrade, which could break governance invariants.
           - it: Should leave the excludedAccounts set empty
-          - comment: This ensures that the excluded supply cannot be changed during an upgrade, which could break governance invariants.
 
   - given: In the ERC-165 context
     and:
@@ -90,12 +90,12 @@ TokenVotingTest:
     and:
       - when: Calling totalVotingPower() with no accounts in the excluded list
         then:
-          - it: Should return the token's past total supply minus the past votes of the DAO at the given timepoint
+          - it: Should return the token's past total supply
       - when: Calling totalVotingPower() with one account in the excluded list
         and:
           - given: The excluded account has voting power at the given timepoint
             then:
-              - it: Should return the token's past total supply minus the past votes of the DAO and the excluded account
+              - it: Should return the token's past total supply minus the past votes of the excluded accounts
           - when: Creating a proposal
             and:
               - given: The total voting power after excluding accounts is greater than 0
@@ -109,7 +109,7 @@ TokenVotingTest:
 
       - when: Calling totalVotingPower() with multiple accounts in the excluded list
         then:
-          - it: Should correctly subtract the past votes of all excluded accounts (including the DAO) from the past total supply
+          - it: Should correctly subtract the past votes of all excluded accounts from the past total supply
       - when: Calling totalVotingPower() with an excluded account that has zero voting power at the timepoint
         then:
           - it: Should produce the same result as if the account was not excluded

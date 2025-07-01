@@ -4,15 +4,25 @@ Below is the graphical summary of the tests described within [test/*.t.yaml](./t
 
 ```
 GovernanceERC20Test
-├── Given The contract is deployed with default mint settings
+├── Given The contract is being deployed with default mint settings
 │   ├── When Calling initialize again
 │   │   └── It reverts if trying to re-initialize
 │   ├── When Checking the token name and symbol
 │   │   └── It sets the token name and symbol
 │   ├── When Checking the managing DAO
 │   │   └── It sets the managing DAO
-│   └── When Deploying with mismatched receivers and amounts arrays
-│       └── It reverts if the `receivers` and `amounts` array lengths in the mint settings mismatch
+│   ├── When Deploying with mismatched receivers and amounts arrays
+│   │   └── It reverts if the `receivers` and `amounts` array lengths in the mint settings mismatch
+│   ├── When Calling initialize with a list of accounts to be selfdelegated
+│   │   ├── It Should successfully initialize the token
+│   │   ├── It Should call _delegate for each specified account to itself
+│   │   └── It Should ensure each specified account has a vote checkpoint created at initialization
+│   ├── When Calling initialize with an empty list of accounts for selfdelegation
+│   │   └── It Should initialize successfully without performing any initial self-delegations
+│   ├── When Calling initialize with address0 in the list of accounts to be selfdelegated
+│   │   └── It Should revert with CannotSelfDelegateAddress0()
+│   └── When Calling initialize with duplicate addresses in the list of accounts to be selfdelegated
+│       └── It Should self-delegate the address once and initialize successfully
 ├── Given The contract is deployed // ERC-165
 │   ├── When Calling supportsInterface with the empty interface
 │   │   └── It does not support the empty interface
@@ -344,13 +354,22 @@ TokenVotingTest
 │   ├── When Calling initialize on an uninitialized plugin
 │   │   ├── It emits the `MembershipContractAnnounced` event
 │   │   └── It sets the voting settings, token, minimal approval and metadata
-│   └── Given An IVotes compatible token
-│       ├── When The token indexes by block number
-│       │   └── It Should use block numbers for indexing
-│       ├── When The token indexes by timestamp
-│       │   └── It Should use timestamps for indexing
-│       └── When The token does not report any clock data
-│           └── It Should assume a block number indexing
+│   ├── Given An IVotes compatible token
+│   │   ├── When The token indexes by block number
+│   │   │   └── It Should use block numbers for indexing
+│   │   ├── When The token indexes by timestamp
+│   │   │   └── It Should use timestamps for indexing
+│   │   └── When The token does not report any clock data
+│   │       └── It Should assume a block number indexing
+│   ├── When Calling initialize with a list of excluded accounts
+│   │   ├── It Should correctly add all provided addresses to the excludedAccounts set
+│   │   └── It Should allow an empty list of excluded accounts
+│   └── When Calling initialize with duplicate addresses in the excluded accounts list
+│       └── It Should store each address only once in the excludedAccounts set
+├── Given The plugin has been upgraded from a version before build 4
+│   └── When Calling initializeFrom with fromBuild  4
+│       ├── It Should not initialize or modify the excludedAccounts set // This ensures that the excluded supply cannot be changed during an upgrade, which could break governance invariants.
+│       └── It Should leave the excludedAccounts set empty
 ├── Given In the ERC165 context
 │   ├── When Calling supportsInterface0xffffffff
 │   │   └── It does not support the empty interface
@@ -384,6 +403,23 @@ TokenVotingTest
 │   │   └── It creates proposal with default values if `data` param is encoded with custom values
 │   └── When Creating a proposal with empty data
 │       └── It creates proposal with default values if `data` param is passed as empty
+├── Given Account exclusion
+│   ├── When Calling totalVotingPower with no accounts in the excluded list
+│   │   └── It Should return the token's past total supply
+│   ├── When Calling totalVotingPower with one account in the excluded list
+│   │   ├── Given The excluded account has voting power at the given timepoint
+│   │   │   └── It Should return the token's past total supply minus the past votes of the DAO and the excluded account
+│   │   └── When Creating a proposal
+│   │       ├── Given The total voting power after excluding accounts is greater than 0
+│   │       │   ├── It Should create the proposal successfully
+│   │       │   ├── It Should calculate minVotingPower based on the effective total voting power (after exclusions)
+│   │       │   └── It Should calculate minApprovalPower based on the effective total voting power (after exclusions)
+│   │       └── Given The total voting power after excluding accounts is 0
+│   │           └── It Should revert with NoVotingPower()
+│   ├── When Calling totalVotingPower with multiple accounts in the excluded list
+│   │   └── It Should correctly subtract the past votes of all excluded accounts from the past total supply
+│   └── When Calling totalVotingPower with an excluded account that has zero voting power at the timepoint
+│       └── It Should produce the same result as if the account was not excluded
 ├── Given In the Proposal creation context
 │   ├── Given minProposerVotingPower  0
 │   │   └── When The creator has no voting power
@@ -570,8 +606,22 @@ TokenVotingSetupTest
 │   │   └── It correctly returns plugin, helpers and permissions, when a governance token address is supplied
 │   ├── When Calling prepareInstallation and a token address is not supplied
 │   │   └── It correctly returns plugin, helpers and permissions, when a token address is not supplied
-│   └── When Calling prepareInstallation and a token address is not passed
-│       └── It correctly sets up the plugin and helpers, when a token address is not passed
+│   ├── When Calling prepareInstallation and a token address is not passed
+│   │   └── It correctly sets up the plugin and helpers, when a token address is not passed
+│   ├── Given Creating a new token
+│   │   ├── When The list of excluded accounts is not empty
+│   │   │   ├── It Should prepare initialization data for the new GovernanceERC20 token that includes the excluded accounts for self-delegation
+│   │   │   └── It Should prepare initialization data for the TokenVoting plugin that includes the same list of excluded accounts
+│   │   └── When The list of excluded accounts is empty
+│   │       └── It Should prepare initialization data for both the token and plugin with an empty list of excluded accounts
+│   ├── When Calling prepareInstallation to use an existing token with a list of excluded accounts
+│   │   ├── It Should prepare initialization data for the TokenVoting plugin that includes the list of excluded accounts
+│   │   └── It Should not attempt to modify the existing token
+│   └── Given A set of installation parameters including a list of excluded accounts
+│       ├── When Calling encodeInstallationParameters
+│       │   └── It Should produce a byte string containing all parameters, including the excluded accounts
+│       └── When Calling decodeInstallationParameters on the encoded byte string
+│           └── It Should correctly decode all original parameters, including the full list of excluded accounts
 ├── Given The context is prepareUpdate
 │   ├── When Calling prepareUpdate for an update from build 1
 │   │   └── It returns the permissions expected for the update from build 1
@@ -589,7 +639,83 @@ TokenVotingSetupTest
 │   │   └── It Should return the correct ABI-encoded byte representation
 │   └── When Calling decodeInstallationParameters with the encoded data
 │       └── It Should return the original installation parameters
-├── Given The installation request is for a new token // The token address in TokenSettings is address(0)
+├── Given The installation request is for a new token
+│   └── When Calling prepareInstallation
+│       └── It Should return exactly 7 permissions to be granted, including one for minting
+├── Given The installation request is for an existing IVotescompliant token
+│   └── When Calling prepareInstallation 2
+│       └── It Should return exactly 6 permissions to be granted and NOT deploy a new token
+├── Given A plugin is being updated from a build version less than 3
+│   └── When Calling prepareUpdate with fromBuild  2
+│       ├── It Should return the initData for the update and a new VotingPowerCondition helper
+│       └── It Should return 5 permission changes (1 revoke and 4 grants)
+├── Given A plugin is being uninstalled
+│   └── When Calling prepareUninstallation
+│       └── It Should return exactly 6 permissions to be revoked
+├── Given A token contract that implements the IVotes interface functions
+│   └── When Calling supportsIVotesInterface with the tokens address
+│       └── It Should return true
+└── Given A token contract that does not implement the IVotes interface functions
+    └── When Calling supportsIVotesInterface with the tokens address 2
+        └── It Should return false
+```
+```
+TokenVotingSetupZkSyncTest
+├── When Calling supportsInterface0xffffffff
+│   └── It does not support the empty interface
+├── When Calling governanceERC20Base and governanceWrappedERC20Base after initialization // This test is skipped if the network is ZkSync
+│   └── It stores the bases provided through the constructor
+├── Given The context is prepareInstallation
+│   ├── When Calling prepareInstallation with data that is empty or not of minimum length
+│   │   └── It fails if data is empty, or not of minimum length
+│   ├── When Calling prepareInstallation if MintSettings arrays do not have the same length
+│   │   └── It fails if `MintSettings` arrays do not have the same length
+│   ├── When Calling prepareInstallation if passed token address is not a contract
+│   │   └── It fails if passed token address is not a contract
+│   ├── When Calling prepareInstallation if passed token address is not ERC20
+│   │   └── It fails if passed token address is not ERC20
+│   ├── When Calling prepareInstallation and an ERC20 token address is supplied
+│   │   └── It correctly returns plugin, helpers and permissions, when an ERC20 token address is supplied
+│   ├── When Calling prepareInstallation and an ERC20 token address is supplied 2
+│   │   └── It correctly sets up `GovernanceWrappedERC20` helper, when an ERC20 token address is supplied
+│   ├── When Calling prepareInstallation and a governance token address is supplied
+│   │   └── It correctly returns plugin, helpers and permissions, when a governance token address is supplied
+│   ├── When Calling prepareInstallation and a token address is not supplied
+│   │   └── It correctly returns plugin, helpers and permissions, when a token address is not supplied
+│   ├── When Calling prepareInstallation and a token address is not passed
+│   │   └── It correctly sets up the plugin and helpers, when a token address is not passed
+│   ├── Given Creating a new token
+│   │   ├── When The list of excluded accounts is not empty
+│   │   │   ├── It Should prepare initialization data for the new GovernanceERC20 token that includes the excluded accounts for self-delegation
+│   │   │   └── It Should prepare initialization data for the TokenVoting plugin that includes the same list of excluded accounts
+│   │   └── When The list of excluded accounts is empty
+│   │       └── It Should prepare initialization data for both the token and plugin with an empty list of excluded accounts
+│   ├── When Calling prepareInstallation to use an existing token with a list of excluded accounts
+│   │   ├── It Should prepare initialization data for the TokenVoting plugin that includes the list of excluded accounts
+│   │   └── It Should not attempt to modify the existing token
+│   └── Given A set of installation parameters including a list of excluded accounts
+│       ├── When Calling encodeInstallationParameters
+│       │   └── It Should produce a byte string containing all parameters, including the excluded accounts
+│       └── When Calling decodeInstallationParameters on the encoded byte string
+│           └── It Should correctly decode all original parameters, including the full list of excluded accounts
+├── Given The context is prepareUpdate
+│   ├── When Calling prepareUpdate for an update from build 1
+│   │   └── It returns the permissions expected for the update from build 1
+│   ├── When Calling prepareUpdate for an update from build 2
+│   │   └── It returns the permissions expected for the update from build 2
+│   └── When Calling prepareUpdate for an update from build 3
+│       └── It returns the permissions expected for the update from build 3 (empty list)
+├── Given The context is prepareUninstallation
+│   ├── When Calling prepareUninstallation and helpers contain a GovernanceWrappedERC20 token
+│   │   └── It correctly returns permissions, when the required number of helpers is supplied
+│   └── When Calling prepareUninstallation and helpers contain a GovernanceERC20 token
+│       └── It correctly returns permissions, when the required number of helpers is supplied
+├── Given The installation parameters are defined
+│   ├── When Calling encodeInstallationParameters with the parameters
+│   │   └── It Should return the correct ABI-encoded byte representation
+│   └── When Calling decodeInstallationParameters with the encoded data
+│       └── It Should return the original installation parameters
+├── Given The installation request is for a new token
 │   └── When Calling prepareInstallation
 │       └── It Should return exactly 7 permissions to be granted, including one for minting
 ├── Given The installation request is for an existing IVotescompliant token
