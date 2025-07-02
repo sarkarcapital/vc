@@ -149,7 +149,7 @@ contract SimpleBuilder is TestBase {
             }
 
             token_ = new GovernanceERC20(
-                dao, "MyToken", "SYM", GovernanceERC20.MintSettings(newTokenHolders, newTokenBalances), excludedAccounts
+                dao, "MyToken", "SYM", GovernanceERC20.MintSettings(newTokenHolders, newTokenBalances)
             );
         } else {
             token_ = token;

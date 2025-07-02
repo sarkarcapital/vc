@@ -130,11 +130,7 @@ contract TokenVotingSetupZkSync is PluginUpgradeableSetup {
                     );
                 }
             } else {
-                token = address(
-                    new GovernanceERC20(
-                        IDAO(_dao), tokenSettings.name, tokenSettings.symbol, mintSettings, excludedAccounts
-                    )
-                );
+                token = address(new GovernanceERC20(IDAO(_dao), tokenSettings.name, tokenSettings.symbol, mintSettings));
             }
 
             // Prepare and deploy plugin proxy.
