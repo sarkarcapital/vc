@@ -23,23 +23,23 @@ contract ERC20ClockMock is ERC20, IERC6372Upgradeable, IVotesUpgradeable {
         return "mode=blocknumber&from=default";
     }
 
-    function balanceOf(address account) public pure override returns (uint256) {
+    function balanceOf(address) public pure override returns (uint256) {
         return 55555555555;
     }
 
-    function getVotes(address account) external pure override returns (uint256) {
+    function getVotes(address) external pure override returns (uint256) {
         return 55555555555;
     }
 
-    function getPastVotes(address account, uint256 timepoint) external pure override returns (uint256) {
+    function getPastVotes(address, uint256) external pure override returns (uint256) {
         return 55555555555;
     }
 
-    function getPastTotalSupply(uint256 timepoint) external pure override returns (uint256) {
+    function getPastTotalSupply(uint256) external pure override returns (uint256) {
         return 55555555555;
     }
 
-    function delegates(address account) external pure override returns (address) {}
+    function delegates(address) external pure override returns (address) {}
 
     function delegate(address delegatee) external override {}
 
@@ -52,23 +52,23 @@ contract ERC20ClockMock is ERC20, IERC6372Upgradeable, IVotesUpgradeable {
 contract ERC20NoClockMock is ERC20, IVotesUpgradeable {
     constructor() ERC20("Name", "TKN") {}
 
-    function balanceOf(address account) public pure override returns (uint256) {
+    function balanceOf(address) public pure override returns (uint256) {
         return 55555555555;
     }
 
-    function getVotes(address account) external pure override returns (uint256) {
+    function getVotes(address) external pure override returns (uint256) {
         return 55555555555;
     }
 
-    function getPastVotes(address account, uint256 timepoint) external pure override returns (uint256) {
+    function getPastVotes(address, uint256) external pure override returns (uint256) {
         return 55555555555;
     }
 
-    function getPastTotalSupply(uint256 timepoint) external pure override returns (uint256) {
+    function getPastTotalSupply(uint256) external pure override returns (uint256) {
         return 55555555555;
     }
 
-    function delegates(address account) external pure override returns (address) {}
+    function delegates(address) external pure override returns (address) {}
 
     function delegate(address delegatee) external override {}
 
