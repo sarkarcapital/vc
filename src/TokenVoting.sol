@@ -108,7 +108,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         if (_fromBuild < 4) {
             _detectTokenClock();
 
-            // @dev The list of excluded accounts are intentially skipped here
+            // @dev The list of excluded accounts are intentionally skipped here
             //      Changing the excluded supply on the fly could break important governance invariants,
             //      therefore such feature is only allowed during the first initialization.
         }
