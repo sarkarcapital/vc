@@ -54,7 +54,8 @@ contract UpgradingTest is Test {
 
     function test_WhenUpgradingWithInitializeFrom() external givenTheContractIsAtR1B1 {
         // It Upgrades from v1.1 with `initializeFrom`
-        (DAO dao,, IVotesUpgradeable token,) = new SimpleBuilder().build();
+        (DAO dao,,,) = new SimpleBuilder().build();
+        ERC20ClockMock tok = new ERC20ClockMock(true);
 
         // Install as 1.1
         TokenVotingR1B1 plugin = TokenVotingR1B1(
@@ -71,12 +72,19 @@ contract UpgradingTest is Test {
                             minDuration: 60 * 60,
                             minProposerVotingPower: 12341234
                         }),
-                        token
+                        tok
                     )
                 )
             )
         );
 
+        // Create a proposal
+        dao.grant(address(plugin), address(this), keccak256("CREATE_PROPOSAL_PERMISSION"));
+        uint256 proposalId = plugin.createProposal(
+            "proposal-meta", new IDAOR1B1.Action[](0), 0, 0, 0, IMajorityVotingR1B1.VoteOption.None, false
+        );
+
+        // Upgrade
         dao.grant(address(plugin), address(this), keccak256("UPGRADE_PLUGIN_PERMISSION"));
 
         address originalImpl = address(plugin.implementation());
@@ -96,7 +104,7 @@ contract UpgradingTest is Test {
                         minDuration: 60 * 60,
                         minProposerVotingPower: 12341234
                     }),
-                    token
+                    tok
                 )
             )
         );
@@ -142,10 +150,23 @@ contract UpgradingTest is Test {
                 minDuration: 60 * 60,
                 minProposerVotingPower: 12341234
             }),
-            token
+            tok
         );
 
-        // Should detect the token clock
+        (bool open, bool executed, MajorityVotingBase.ProposalParameters memory parameters,,,,) =
+            TokenVoting(address(plugin)).getProposal(proposalId);
+
+        // Existing proposals should remain available
+
+        assertTrue(open);
+        assertFalse(executed);
+        assertEq(parameters.startDate, block.timestamp);
+        assertEq(parameters.endDate, block.timestamp + 60 * 60);
+
+        // Should detect the token clock (timestamp)
+        proposalId = TokenVoting(address(plugin)).createProposal("proposal-meta-2", new Action[](0), 0, 0, "");
+        (open, executed, parameters,,,,) = TokenVoting(address(plugin)).getProposal(proposalId);
+        assertEq(parameters.snapshotTimepoint, block.timestamp - 1);
     }
 
     modifier givenTheContractIsAtR1B2() {
