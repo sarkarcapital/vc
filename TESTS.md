@@ -11,18 +11,8 @@ GovernanceERC20Test
 │   │   └── It sets the token name and symbol
 │   ├── When Checking the managing DAO
 │   │   └── It sets the managing DAO
-│   ├── When Deploying with mismatched receivers and amounts arrays
-│   │   └── It reverts if the `receivers` and `amounts` array lengths in the mint settings mismatch
-│   ├── When Calling initialize with a list of accounts to be selfdelegated
-│   │   ├── It Should successfully initialize the token
-│   │   ├── It Should call _delegate for each specified account to itself
-│   │   └── It Should ensure each specified account has a vote checkpoint created at initialization
-│   ├── When Calling initialize with an empty list of accounts for selfdelegation
-│   │   └── It Should initialize successfully without performing any initial self-delegations
-│   ├── When Calling initialize with address0 in the list of accounts to be selfdelegated
-│   │   └── It Should revert with CannotSelfDelegateAddress0()
-│   └── When Calling initialize with duplicate addresses in the list of accounts to be selfdelegated
-│       └── It Should self-delegate the address once and initialize successfully
+│   └── When Deploying with mismatched receivers and amounts arrays
+│       └── It reverts if the `receivers` and `amounts` array lengths in the mint settings mismatch
 ├── Given The contract is deployed // ERC-165
 │   ├── When Calling supportsInterface with the empty interface
 │   │   └── It does not support the empty interface
@@ -367,7 +357,7 @@ TokenVotingTest
 │   └── When Calling initialize with duplicate addresses in the excluded accounts list
 │       └── It Should store each address only once in the excludedAccounts set
 ├── Given The plugin has been upgraded from a version before build 4
-│   └── When Calling initializeFrom with fromBuild  4
+│   └── When Calling initializeFrom with fromBuild below 4
 │       ├── It Should not initialize or modify the excludedAccounts set // This ensures that the excluded supply cannot be changed during an upgrade, which could break governance invariants.
 │       └── It Should leave the excludedAccounts set empty
 ├── Given In the ERC165 context
@@ -408,7 +398,7 @@ TokenVotingTest
 │   │   └── It Should return the token's past total supply
 │   ├── When Calling totalVotingPower with one account in the excluded list
 │   │   ├── Given The excluded account has voting power at the given timepoint
-│   │   │   └── It Should return the token's past total supply minus the past votes of the DAO and the excluded account
+│   │   │   └── It Should return the token's past total supply minus the past votes of the excluded accounts
 │   │   └── When Creating a proposal
 │   │       ├── Given The total voting power after excluding accounts is greater than 0
 │   │       │   ├── It Should create the proposal successfully
@@ -663,8 +653,6 @@ TokenVotingSetupTest
 TokenVotingSetupZkSyncTest
 ├── When Calling supportsInterface0xffffffff
 │   └── It does not support the empty interface
-├── When Calling governanceERC20Base and governanceWrappedERC20Base after initialization // This test is skipped if the network is ZkSync
-│   └── It stores the bases provided through the constructor
 ├── Given The context is prepareInstallation
 │   ├── When Calling prepareInstallation with data that is empty or not of minimum length
 │   │   └── It fails if data is empty, or not of minimum length

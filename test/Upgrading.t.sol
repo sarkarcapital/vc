@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {TokenVoting} from "../src/TokenVoting.sol";
+import {Action} from "@aragon/osx-commons-contracts/src/executors/IExecutor.sol";
 
 import {TokenVoting as TokenVotingR1B1} from "./old-versions/v1.1/TokenVoting.sol";
 import {MajorityVotingBase as MajorityVotingBaseR1B1} from "./old-versions/v1.1/MajorityVotingBase.sol";
@@ -60,7 +61,7 @@ contract UpgradingTest is Test {
                             supportThreshold: 123_456,
                             minParticipation: 234_567,
                             minDuration: 60 * 60,
-                            minProposerVotingPower: 11223344556677889900
+                            minProposerVotingPower: 12341234
                         }),
                         token
                     )
@@ -85,7 +86,7 @@ contract UpgradingTest is Test {
                         supportThreshold: 123_456,
                         minParticipation: 234_567,
                         minDuration: 60 * 60,
-                        minProposerVotingPower: 11223344556677889900
+                        minProposerVotingPower: 12341234
                     }),
                     token
                 )
@@ -131,10 +132,12 @@ contract UpgradingTest is Test {
                 supportThreshold: 123_456,
                 minParticipation: 234_567,
                 minDuration: 60 * 60,
-                minProposerVotingPower: 11223344556677889900
+                minProposerVotingPower: 12341234
             }),
             token
         );
+
+        // Should detect the token clock
     }
 
     modifier givenTheContractIsAtR1B2() {
@@ -158,7 +161,7 @@ contract UpgradingTest is Test {
                             supportThreshold: 123_456,
                             minParticipation: 234_567,
                             minDuration: 60 * 60,
-                            minProposerVotingPower: 11223344556677889900
+                            minProposerVotingPower: 12341234
                         }),
                         token
                     )
@@ -183,7 +186,7 @@ contract UpgradingTest is Test {
                         supportThreshold: 123_456,
                         minParticipation: 234_567,
                         minDuration: 60 * 60,
-                        minProposerVotingPower: 11223344556677889900
+                        minProposerVotingPower: 12341234
                     }),
                     token
                 )
@@ -229,83 +232,127 @@ contract UpgradingTest is Test {
                 supportThreshold: 123_456,
                 minParticipation: 234_567,
                 minDuration: 60 * 60,
-                minProposerVotingPower: 11223344556677889900
+                minProposerVotingPower: 12341234
             }),
             token
         );
+
+        // Should detect the token clock
     }
 
-    // modifier givenTheContractIsAtR1B3() {
-    //     _;
-    // }
+    modifier givenTheContractIsAtR1B3() {
+        _;
+    }
 
-    // function test_WhenUpgradingWithInitializeFrom3() external givenTheContractIsAtR1B3 {
-    //     // It upgrades from R1 B3 with `initializeFrom`
-    //     (DAO dao,, IVotesUpgradeable token,) = new SimpleBuilder().build();
+    function test_WhenUpgradingWithInitializeFrom3() external givenTheContractIsAtR1B3 {
+        // It upgrades from R1 B3 with `initializeFrom`
+        (DAO dao,, IVotesUpgradeable token,) = new SimpleBuilder().build();
 
-    //     // Install as 1.3
-    //     TokenVotingR1B3 plugin = TokenVotingR1B3(
-    //         ProxyLib.deployUUPSProxy(
-    //             address(new TokenVotingR1B3()),
-    //             abi.encodeCall(
-    //                 TokenVotingR1B3.initialize,
-    //                 (
-    //                     dao,
-    //                     MajorityVotingBaseR1B3.VotingSettings({
-    //                         votingMode: MajorityVotingBaseR1B3.VotingMode.EarlyExecution,
-    //                         supportThreshold: 123_456,
-    //                         minParticipation: 234_567,
-    //                         minDuration: 60 * 60,
-    //                         minProposerVotingPower: 11223344556677889900
-    //                     }),
-    //                     token,
-    //                     IPlugin.TargetConfig({target: address(dao), operation: IPlugin.Operation.Call}),
-    //                     112233, // minApprovals
-    //                     "some-meta"
-    //                 )
-    //             )
-    //         )
-    //     );
+        // Install as 1.3
+        TokenVotingR1B3 plugin = TokenVotingR1B3(
+            ProxyLib.deployUUPSProxy(
+                address(new TokenVotingR1B3()),
+                abi.encodeCall(
+                    TokenVotingR1B3.initialize,
+                    (
+                        dao,
+                        MajorityVotingBaseR1B3.VotingSettings({
+                            votingMode: MajorityVotingBaseR1B3.VotingMode.EarlyExecution,
+                            supportThreshold: 123_456,
+                            minParticipation: 234_567,
+                            minDuration: 60 * 60,
+                            minProposerVotingPower: 12341234
+                        }),
+                        token,
+                        IPlugin.TargetConfig({target: address(dao), operation: IPlugin.Operation.Call}),
+                        556677, // minApprovals
+                        "more-meta"
+                    )
+                )
+            )
+        );
 
-    //     dao.grant(address(plugin), address(this), keccak256("UPGRADE_PLUGIN_PERMISSION"));
+        // Create a proposal
+        dao.grant(address(plugin), address(this), keccak256("CREATE_PROPOSAL_PERMISSION"));
+        dao.grant(address(plugin), address(this), keccak256("EXECUTE_PROPOSAL_PERMISSION"));
 
-    //     address originalImpl = address(plugin.implementation());
+        uint256 proposalId = plugin.createProposal("proposal-meta", new Action[](0), 0, 0, "");
 
-    //     // It The old `initialize` function fails during the upgrade
-    //     vm.expectRevert(AlreadyInitialized.selector);
-    //     plugin.upgradeToAndCall(
-    //         originalImpl,
-    //         abi.encodeCall(
-    //             TokenVotingR1B3.initialize,
-    //             (
-    //                 dao,
-    //                 MajorityVotingBaseR1B3.VotingSettings({
-    //                     votingMode: MajorityVotingBaseR1B3.VotingMode.EarlyExecution,
-    //                     supportThreshold: 123_456,
-    //                     minParticipation: 234_567,
-    //                     minDuration: 60 * 60,
-    //                     minProposerVotingPower: 11223344556677889900
-    //                 }),
-    //                 token,
-    //                 IPlugin.TargetConfig({target: address(dao), operation: IPlugin.Operation.Call}),
-    //                 112233, // minApprovals
-    //                 "some-meta"
-    //             )
-    //         )
-    //     );
+        // Upgrade
+        dao.grant(address(plugin), address(this), keccak256("UPGRADE_PLUGIN_PERMISSION"));
 
-    //     // address newImpl = address(new TokenVoting());
+        address originalImpl = address(plugin.implementation());
 
-    //     // It initializeFrom succeeds
-    //     // plugin.upgradeToAndCall(newImpl, abi.encodeCall(TokenVoting.initializeFrom, (3, abi.encode())));
+        // It The old `initialize` function fails during the upgrade
+        vm.expectRevert(AlreadyInitialized.selector);
+        plugin.upgradeToAndCall(
+            originalImpl,
+            abi.encodeCall(
+                TokenVotingR1B3.initialize,
+                (
+                    dao,
+                    MajorityVotingBaseR1B3.VotingSettings({
+                        votingMode: MajorityVotingBaseR1B3.VotingMode.EarlyExecution,
+                        supportThreshold: 123_456,
+                        minParticipation: 234_567,
+                        minDuration: 60 * 60,
+                        minProposerVotingPower: 12341234
+                    }),
+                    token,
+                    IPlugin.TargetConfig({target: address(dao), operation: IPlugin.Operation.Call}),
+                    556677, // minApprovals
+                    "some-more-meta"
+                )
+            )
+        );
 
-    //     // address currentImpl = address(plugin.implementation());
-    //     // assertNotEq(originalImpl, currentImpl);
-    //     // assertEq(currentImpl, newImpl);
+        address newImpl = address(new TokenVoting());
 
-    //     // It protocol version remains
-    //     // It new settings are applied
-    //     // It the original `initialize` function is disabled post-upgrade
-    //     vm.skip(true);
-    // }
+        // It initializeFrom succeeds
+        plugin.upgradeToAndCall(newImpl, abi.encodeCall(TokenVoting.initializeFrom, (3, abi.encode())));
+
+        address currentImpl = address(plugin.implementation());
+        assertNotEq(originalImpl, currentImpl);
+        assertEq(currentImpl, newImpl);
+
+        // It protocol versions are updated correctly
+        uint8[3] memory version = TokenVoting(address(plugin)).protocolVersion();
+        assertEq(version[0], 1);
+        assertEq(version[1], 4);
+        assertEq(version[2], 0);
+
+        // It settings remain
+        assertEq(TokenVoting(address(plugin)).minApproval(), 556677);
+
+        IPlugin.TargetConfig memory newTargetConfig = TokenVoting(address(plugin)).getTargetConfig();
+        vm.assertEq(newTargetConfig.target, address(dao));
+        vm.assertEq(uint8(newTargetConfig.operation), uint8(IPlugin.Operation.Call));
+        vm.assertEq(TokenVoting(address(plugin)).getMetadata(), "more-meta");
+
+        // It the original `initialize` function is disabled post-upgrade
+        vm.expectRevert();
+        plugin.initialize(
+            dao,
+            MajorityVotingBaseR1B3.VotingSettings({
+                votingMode: MajorityVotingBaseR1B3.VotingMode.EarlyExecution,
+                supportThreshold: 123_456,
+                minParticipation: 234_567,
+                minDuration: 60 * 60,
+                minProposerVotingPower: 12341234
+            }),
+            token,
+            IPlugin.TargetConfig({target: address(dao), operation: IPlugin.Operation.Call}),
+            556677, // minApprovals
+            "some-meta"
+        );
+
+        // Should detect the token clock
+        // Existing proposals should remain available
+        (bool open, bool executed, MajorityVotingBaseR1B3.ProposalParameters memory parameters,,,,) =
+            plugin.getProposal(proposalId);
+        assertTrue(open);
+        assertFalse(executed);
+        assertEq(parameters.startDate, block.timestamp);
+        assertEq(parameters.endDate, block.timestamp + 60 * 60);
+    }
 }

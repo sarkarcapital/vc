@@ -26,13 +26,6 @@ TokenVotingTest:
       - when: Calling initialize() with duplicate addresses in the excluded accounts list
         then:
           - it: Should store each address only once in the excludedAccounts set
-  - given: The plugin has been upgraded from a version before build 4
-    and:
-      - when: Calling initializeFrom() with _fromBuild < 4
-        then:
-          - it: Should not initialize or modify the excludedAccounts set
-            comment: This ensures that the excluded supply cannot be changed during an upgrade, which could break governance invariants.
-          - it: Should leave the excludedAccounts set empty
 
   - given: In the ERC-165 context
     and:
