@@ -23,12 +23,20 @@ contract ERC20ClockMock is ERC20, IERC6372Upgradeable, IVotesUpgradeable {
         return "mode=blocknumber&from=default";
     }
 
-    function getVotes(address account) external pure override returns (uint256) {}
+    function balanceOf(address account) public pure override returns (uint256) {
+        return 55555555555;
+    }
 
-    function getPastVotes(address account, uint256 timepoint) external pure override returns (uint256) {}
+    function getVotes(address account) external pure override returns (uint256) {
+        return 55555555555;
+    }
+
+    function getPastVotes(address account, uint256 timepoint) external pure override returns (uint256) {
+        return 55555555555;
+    }
 
     function getPastTotalSupply(uint256 timepoint) external pure override returns (uint256) {
-        return 100;
+        return 55555555555;
     }
 
     function delegates(address account) external pure override returns (address) {}
@@ -44,12 +52,20 @@ contract ERC20ClockMock is ERC20, IERC6372Upgradeable, IVotesUpgradeable {
 contract ERC20NoClockMock is ERC20, IVotesUpgradeable {
     constructor() ERC20("Name", "TKN") {}
 
-    function getVotes(address account) external pure override returns (uint256) {}
+    function balanceOf(address account) public pure override returns (uint256) {
+        return 55555555555;
+    }
 
-    function getPastVotes(address account, uint256 timepoint) external pure override returns (uint256) {}
+    function getVotes(address account) external pure override returns (uint256) {
+        return 55555555555;
+    }
+
+    function getPastVotes(address account, uint256 timepoint) external pure override returns (uint256) {
+        return 55555555555;
+    }
 
     function getPastTotalSupply(uint256 timepoint) external pure override returns (uint256) {
-        return 100;
+        return 55555555555;
     }
 
     function delegates(address account) external pure override returns (address) {}

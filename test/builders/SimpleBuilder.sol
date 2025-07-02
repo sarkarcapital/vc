@@ -124,7 +124,6 @@ contract SimpleBuilder is TestBase {
     }
 
     /// @dev Creates a DAO with the given orchestration settings.
-    /// @dev The setup is done on block/timestamp 0 and tests should be made on block/timestamp 1 or later.
     function build()
         public
         returns (DAO dao, TokenVoting plugin, IVotesUpgradeable token_, VotingPowerCondition condition)
