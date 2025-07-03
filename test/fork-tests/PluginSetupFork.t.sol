@@ -75,7 +75,7 @@ contract PluginSetupForkTest is ForkTestBase {
             receivers[0] = alice;
             uint256[] memory amounts = new uint256[](1);
             amounts[0] = 100 ether;
-            GovernanceERC20.MintSettings memory initialMint = GovernanceERC20.MintSettings(receivers, amounts);
+            GovernanceERC20.MintSettings memory initialMint = GovernanceERC20.MintSettings(receivers, amounts, true);
             existingToken = new GovernanceERC20(dao, "Existing Token", "EXIST", initialMint);
         }
 
@@ -98,7 +98,7 @@ contract PluginSetupForkTest is ForkTestBase {
             TokenVotingSetup.TokenSettings memory tokenSettings =
                 TokenVotingSetup.TokenSettings({addr: address(existingToken), name: "Test Token", symbol: "TTK"});
             GovernanceERC20.MintSettings memory emptyMintSettings =
-                GovernanceERC20.MintSettings(new address[](0), new uint256[](0));
+                GovernanceERC20.MintSettings(new address[](0), new uint256[](0), false);
             IPlugin.TargetConfig memory targetConfig = IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call);
 
             installData = abi.encode(
@@ -203,7 +203,7 @@ contract PluginSetupForkTest is ForkTestBase {
             receivers[0] = alice;
             uint256[] memory amounts = new uint256[](1);
             amounts[0] = 1000 ether;
-            GovernanceERC20.MintSettings memory mintSettings = GovernanceERC20.MintSettings(receivers, amounts);
+            GovernanceERC20.MintSettings memory mintSettings = GovernanceERC20.MintSettings(receivers, amounts, true);
             IPlugin.TargetConfig memory targetConfig = IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call);
 
             installData = abi.encode(votingSettings, tokenSettings, mintSettings, targetConfig, 0, "some-metadata");
@@ -306,7 +306,7 @@ contract PluginSetupForkTest is ForkTestBase {
         TokenVotingSetup.TokenSettings memory tokenSettings =
             TokenVotingSetup.TokenSettings({addr: address(0), name: "Old Token", symbol: "OLD"});
         GovernanceERC20.MintSettings memory mintSettings =
-            GovernanceERC20.MintSettings(new address[](0), new uint256[](0));
+            GovernanceERC20.MintSettings(new address[](0), new uint256[](0), false);
         bytes memory installDataV1 = abi.encode(votingSettings, tokenSettings, mintSettings);
 
         bytes memory initializeFromData;

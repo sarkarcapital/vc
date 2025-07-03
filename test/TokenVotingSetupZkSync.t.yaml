@@ -54,6 +54,9 @@ TokenVotingSetupZkSyncTest:
           - when: Calling decodeInstallationParameters() on the encoded byte string
             then:
               - it: Should correctly decode all original parameters, including the full list of excluded accounts
+          - when: There are excluded accounts but no self delegation
+            then:
+              - it: Should prepare initialization data for both the token and plugin with excluded accounts but no balance excluded
 
   - given: The context is prepareUpdate
     and:

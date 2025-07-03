@@ -49,7 +49,7 @@ contract TokenVotingSetupTest is TestBase {
 
         // Deploy base contracts
         governanceERC20Base = new GovernanceERC20(
-            IDAO(address(0)), "G", "G", GovernanceERC20.MintSettings(new address[](0), new uint256[](0))
+            IDAO(address(0)), "G", "G", GovernanceERC20.MintSettings(new address[](0), new uint256[](0), false)
         );
         governanceWrappedERC20Base = new GovernanceWrappedERC20(IERC20Upgradeable(address(0x1)), "WG", "WG");
 
@@ -65,7 +65,11 @@ contract TokenVotingSetupTest is TestBase {
             minProposerVotingPower: 0
         });
         defaultTokenSettings = PluginSetupContract.TokenSettings({addr: address(0), name: "MyToken", symbol: "TKN"});
-        defaultMintSettings = GovernanceERC20.MintSettings({receivers: new address[](0), amounts: new uint256[](0)});
+        defaultMintSettings = GovernanceERC20.MintSettings({
+            receivers: new address[](0),
+            amounts: new uint256[](0),
+            ensureDelegationOnMint: false
+        });
         defaultTargetConfig = IPlugin.TargetConfig({target: address(dao), operation: IPlugin.Operation.Call});
         defaultMinApproval = 300_000;
         defaultMetadata = "0x11";
@@ -431,7 +435,8 @@ contract TokenVotingSetupTest is TestBase {
         amounts[2] = 1 ether;
         amounts[3] = 1 ether;
 
-        defaultMintSettings = GovernanceERC20.MintSettings({receivers: allAccounts, amounts: amounts});
+        defaultMintSettings =
+            GovernanceERC20.MintSettings({receivers: allAccounts, amounts: amounts, ensureDelegationOnMint: true});
         defaultExcludedAccounts = new address[](2);
         defaultExcludedAccounts[0] = alice;
         defaultExcludedAccounts[1] = bob;
@@ -485,7 +490,8 @@ contract TokenVotingSetupTest is TestBase {
         amounts[2] = 1 ether;
         amounts[3] = 1 ether;
 
-        defaultMintSettings = GovernanceERC20.MintSettings({receivers: allAccounts, amounts: amounts});
+        defaultMintSettings =
+            GovernanceERC20.MintSettings({receivers: allAccounts, amounts: amounts, ensureDelegationOnMint: true});
         defaultExcludedAccounts = new address[](0);
 
         defaultTokenSettings.addr = address(0);
@@ -517,6 +523,65 @@ contract TokenVotingSetupTest is TestBase {
 
         TokenVoting plugin = TokenVoting(pluginAddr);
         assertEq(plugin.totalVotingPower(block.number - 1), 4 ether);
+    }
+
+    function test_WhenThereAreExcludedAccountsButNoSelfDelegation()
+        external
+        givenTheContextIsPrepareInstallation
+        givenCreatingANewToken
+    {
+        // It Should prepare initialization data for both the token and plugin with excluded accounts but no balance excluded
+
+        address[] memory allAccounts = new address[](4);
+        allAccounts[0] = alice;
+        allAccounts[1] = bob;
+        allAccounts[2] = carol;
+        allAccounts[3] = david;
+        uint256[] memory amounts = new uint256[](4);
+        amounts[0] = 1 ether;
+        amounts[1] = 1 ether;
+        amounts[2] = 1 ether;
+        amounts[3] = 1 ether;
+
+        defaultMintSettings =
+            GovernanceERC20.MintSettings({receivers: allAccounts, amounts: amounts, ensureDelegationOnMint: false});
+        defaultExcludedAccounts = new address[](2);
+        defaultExcludedAccounts[0] = alice;
+        defaultExcludedAccounts[1] = bob;
+
+        defaultTokenSettings.addr = address(0);
+        (address pluginAddr, IPluginSetup.PreparedSetupData memory prepared) = pluginSetup.prepareInstallation(
+            address(dao),
+            pluginSetup.encodeInstallationParameters(
+                defaultVotingSettings,
+                defaultTokenSettings,
+                defaultMintSettings,
+                defaultTargetConfig,
+                defaultMinApproval,
+                defaultMetadata,
+                defaultExcludedAccounts
+            )
+        );
+
+        vm.roll(block.number + 10);
+
+        GovernanceERC20 token = GovernanceERC20(prepared.helpers[1]);
+        assertEq(token.balanceOf(alice), 1 ether);
+        assertEq(token.getVotes(alice), 0);
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.balanceOf(bob), 1 ether);
+        assertEq(token.getVotes(bob), 0);
+        assertEq(token.delegates(bob), address(0));
+
+        assertEq(token.balanceOf(carol), 1 ether);
+        assertEq(token.getVotes(carol), 0);
+        assertEq(token.delegates(carol), address(0));
+        assertEq(token.balanceOf(david), 1 ether);
+        assertEq(token.getVotes(david), 0);
+        assertEq(token.delegates(david), address(0));
+
+        TokenVoting plugin = TokenVoting(pluginAddr);
+        assertEq(plugin.totalVotingPower(block.number - 1), 0);
     }
 
     function test_WhenCallingPrepareInstallationToUseAnExistingTokenWithAListOfExcludedAccounts()
@@ -1220,7 +1285,7 @@ contract TokenVotingSetupTest is TestBase {
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = 100e18;
         amounts[1] = 200e18;
-        defaultMintSettings = GovernanceERC20.MintSettings(receivers, amounts);
+        defaultMintSettings = GovernanceERC20.MintSettings(receivers, amounts, false);
         _;
     }
 
@@ -1297,7 +1362,7 @@ contract TokenVotingSetupTest is TestBase {
         receivers[0] = alice;
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 1 ether;
-        defaultMintSettings = GovernanceERC20.MintSettings(receivers, amounts);
+        defaultMintSettings = GovernanceERC20.MintSettings(receivers, amounts, true);
         _;
     }
 

@@ -6,7 +6,7 @@ import {DAO, IDAO} from "@aragon/osx/core/dao/DAO.sol";
 import {GovernanceERC20} from "../src/erc20/GovernanceERC20.sol";
 import {DaoUnauthorized} from "@aragon/osx-commons-contracts/src/permission/auth/auth.sol";
 import {ProxyLib} from "@aragon/osx-commons-contracts/src/utils/deployment/ProxyLib.sol";
-import {IERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {IERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/IERC165Upgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {IERC20PermitUpgradeable} from
     "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20PermitUpgradeable.sol";
@@ -56,7 +56,8 @@ contract GovernanceERC20Test is TestBase {
         amounts[1] = 200 ether;
         amounts[2] = 300 ether;
 
-        GovernanceERC20.MintSettings memory mintSettings = GovernanceERC20.MintSettings(receivers, amounts);
+        GovernanceERC20.MintSettings memory mintSettings =
+            GovernanceERC20.MintSettings({receivers: receivers, amounts: amounts, ensureDelegationOnMint: true});
         token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
     }
 
@@ -66,7 +67,11 @@ contract GovernanceERC20Test is TestBase {
 
     function test_WhenCallingInitializeAgain() external givenTheContractIsBeingDeployedWithDefaultMintSettings {
         // It reverts if trying to re-initialize
-        GovernanceERC20.MintSettings memory emptyMintSettings;
+        GovernanceERC20.MintSettings memory emptyMintSettings = GovernanceERC20.MintSettings({
+            receivers: new address[](0),
+            amounts: new uint256[](0),
+            ensureDelegationOnMint: false
+        });
         vm.expectRevert("Initializable: contract is already initialized");
         token.initialize(dao, TOKEN_NAME, TOKEN_SYMBOL, emptyMintSettings);
     }
@@ -96,7 +101,8 @@ contract GovernanceERC20Test is TestBase {
         amounts[0] = 100 ether;
         amounts[1] = 200 ether;
 
-        GovernanceERC20.MintSettings memory mintSettings = GovernanceERC20.MintSettings(receivers, amounts);
+        GovernanceERC20.MintSettings memory mintSettings =
+            GovernanceERC20.MintSettings({receivers: receivers, amounts: amounts, ensureDelegationOnMint: false});
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -107,7 +113,11 @@ contract GovernanceERC20Test is TestBase {
     }
 
     modifier givenTheContractIsDeployed() {
-        GovernanceERC20.MintSettings memory emptyMintSettings;
+        GovernanceERC20.MintSettings memory emptyMintSettings = GovernanceERC20.MintSettings({
+            receivers: new address[](0),
+            amounts: new uint256[](0),
+            ensureDelegationOnMint: false
+        });
         token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, emptyMintSettings);
         _;
     }
@@ -137,7 +147,11 @@ contract GovernanceERC20Test is TestBase {
     modifier givenTheContractIsDeployed2() {
         // Same as givenTheContractIsDeployed, used for logical separation
 
-        GovernanceERC20.MintSettings memory emptyMintSettings;
+        GovernanceERC20.MintSettings memory emptyMintSettings = GovernanceERC20.MintSettings({
+            receivers: new address[](0),
+            amounts: new uint256[](0),
+            ensureDelegationOnMint: false
+        });
         token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, emptyMintSettings);
         _;
     }
@@ -186,7 +200,8 @@ contract GovernanceERC20Test is TestBase {
         amounts[1] = 200 ether;
         amounts[2] = 300 ether;
 
-        GovernanceERC20.MintSettings memory mintSettings = GovernanceERC20.MintSettings(receivers, amounts);
+        GovernanceERC20.MintSettings memory mintSettings =
+            GovernanceERC20.MintSettings({receivers: receivers, amounts: amounts, ensureDelegationOnMint: true});
         token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
         _;
     }
@@ -196,7 +211,7 @@ contract GovernanceERC20Test is TestBase {
         uint256 aliceBalance = token.balanceOf(alice);
         uint256 bobBalance = token.balanceOf(bob);
 
-        // Initially, users self-delegate upon receiving tokens
+        // Initially, users self-delegate upon receiving tokens (because ensureDelegationOnMint is true)
         assertEq(token.delegates(alice), alice);
         assertEq(token.delegates(bob), bob);
         assertEq(token.getVotes(alice), aliceBalance);
@@ -241,8 +256,13 @@ contract GovernanceERC20Test is TestBase {
     }
 
     modifier givenATokenIsDeployedAndTheMainSignerCanMint() {
-        GovernanceERC20.MintSettings memory emptyMintSettings;
-        token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, emptyMintSettings);
+        // Deploy with ensureDelegationOnMint enabled to test delegation behaviors
+        GovernanceERC20.MintSettings memory mintSettings = GovernanceERC20.MintSettings({
+            receivers: new address[](0),
+            amounts: new uint256[](0),
+            ensureDelegationOnMint: true
+        });
+        token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
         // Grant mint permission to the test contract
         dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
         _;
@@ -262,40 +282,40 @@ contract GovernanceERC20Test is TestBase {
         external
         givenATokenIsDeployedAndTheMainSignerCanMint
     {
-        // It turns on delegation for the `to` address after transfer
+        // It does not turn on delegation for the `to` address after a transfer
         token.mint(alice, 100 ether); // This will self-delegate alice
         assertEq(token.delegates(bob), address(0));
 
         vm.prank(alice);
-        vm.expectEmit(true, true, true, true);
-        emit DelegateChanged(bob, address(0), bob);
         token.transfer(bob, 50 ether);
 
-        assertEq(token.delegates(bob), bob);
-        assertEq(token.getVotes(bob), 50 ether);
+        // Bob is not self-delegated
+        assertEq(token.delegates(bob), address(0));
+        assertEq(token.getVotes(bob), 0);
     }
 
     function test_WhenPerformingAChainOfTransfersABC() external givenATokenIsDeployedAndTheMainSignerCanMint {
-        // It turns on delegation for all users in the chain of transfer A => B => C
-        token.mint(alice, 100 ether); // A
+        // It updates voting power for the sender, but does not self-delegate for receivers
+        token.mint(alice, 100 ether); // A, self-delegates. Votes = 100.
 
         vm.prank(alice);
-        token.transfer(bob, 50 ether); // A -> B
+        token.transfer(bob, 50 ether); // A -> B. Bob does not delegate.
 
         vm.prank(bob);
-        token.transfer(carol, 25 ether); // B -> C
+        token.transfer(carol, 25 ether); // B -> C. Carol does not delegate.
 
         assertEq(token.getVotes(alice), 50 ether);
-        assertEq(token.getVotes(bob), 25 ether);
-        assertEq(token.getVotes(carol), 25 ether);
+        assertEq(token.getVotes(bob), 0);
+        assertEq(token.getVotes(carol), 0);
     }
 
     modifier givenTheReceiverHasManuallyTurnedOffDelegation() {
         token.mint(alice, 100 ether);
-        vm.prank(alice);
-        token.transfer(bob, 50 ether); // Auto-delegation for bob
+        // Mint to Bob so he self-delegates (as per modifier setup)
+        token.mint(bob, 50 ether);
+        // Bob then manually turns off delegation
         vm.prank(bob);
-        token.delegate(address(0)); // Bob manually turns off delegation
+        token.delegate(address(0));
         _;
     }
 
@@ -316,10 +336,15 @@ contract GovernanceERC20Test is TestBase {
         givenATokenIsDeployedAndTheMainSignerCanMint
         givenTheReceiverHasManuallyTurnedOffDelegation
     {
-        // It should not turn on delegation on `mint` if `to` manually turned it off
-        token.mint(bob, 10 ether);
-        assertEq(token.delegates(bob), address(0));
-        assertEq(token.getVotes(bob), 0);
+        // It should turn on delegation on `mint` if `to` has no delegate, even if they turned it off before
+        uint256 previousBalance = token.balanceOf(bob);
+        uint256 mintAmount = 10 ether;
+
+        token.mint(bob, mintAmount);
+
+        // `mint` re-delegates if ensureDelegationOnMint is true and delegates is address(0)
+        assertEq(token.delegates(bob), bob);
+        assertEq(token.getVotes(bob), previousBalance + mintAmount);
     }
 
     modifier givenAUserHasPredelegatedBeforeReceivingTokens() {
@@ -400,6 +425,7 @@ contract GovernanceERC20Test is TestBase {
     {
         // It updates voting power after transfer for `to` if delegation turned on
         token.mint(alice, 100 ether);
+        token.mint(bob, 0); // Self-delegate bob
         assertEq(token.getVotes(bob), 0);
         vm.prank(alice);
         token.transfer(bob, 30 ether);
@@ -412,8 +438,13 @@ contract GovernanceERC20Test is TestBase {
         to = bob;
         other = carol;
 
-        GovernanceERC20.MintSettings memory emptyMintSettings;
-        token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, emptyMintSettings);
+        // Deploy with ensureDelegationOnMint enabled to test delegation behaviors
+        GovernanceERC20.MintSettings memory mintSettings = GovernanceERC20.MintSettings({
+            receivers: new address[](0),
+            amounts: new uint256[](0),
+            ensureDelegationOnMint: true
+        });
+        token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
         dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
         _;
     }
@@ -495,17 +526,15 @@ contract GovernanceERC20Test is TestBase {
         fromDelegate = from;
 
         vm.prank(from);
-        vm.expectEmit(true, true, true, true);
-        emit DelegateChanged(to, address(0), to);
+        // `transfer` does not self-delegate
         token.transfer(to, 100);
-        toDelegate = to;
+        toDelegate = address(0);
 
         assertEq(token.getVotes(from), 0, "`from` has the correct voting power");
         assertEq(token.delegates(from), fromDelegate, "`from`s delegate has not changed");
         assertEq(token.getVotes(fromDelegate), 0, "`from`s delegate has the correct voting power");
-        assertEq(token.getVotes(to), 100, "`to` has the correct voting power");
+        assertEq(token.getVotes(to), 0, "`to` has the correct voting power because they did not delegate");
         assertEq(token.delegates(to), toDelegate, "`to`s delegate has not changed");
-        assertEq(token.getVotes(toDelegate), 100, "`to`s delegate has the correct voting power");
     }
 
     modifier givenTheToAddressHasANonzeroBalance() {
