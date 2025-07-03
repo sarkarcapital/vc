@@ -41,7 +41,8 @@ contract TokenVoting is IMembership, MajorityVotingBase {
     EnumerableSet.AddressSet internal excludedAccounts; // Slot 1
 
     /// @notice Emitted when an account's balance is considered as non-circulating supply. Its balance will be excluded from the token supply computation.
-    event ExcludedFromSupply(address account);
+    /// @param accounts The addresses whose balance is considered as not circulating
+    event ExcludedFromSupply(address[] accounts);
 
     /// @notice Thrown if the voting power is zero
     error NoVotingPower();
@@ -80,11 +81,13 @@ contract TokenVoting is IMembership, MajorityVotingBase {
 
         for (uint256 i; i < _excludedAccounts.length;) {
             excludedAccounts.add(_excludedAccounts[i]);
-            emit ExcludedFromSupply(_excludedAccounts[i]);
 
             unchecked {
                 ++i;
             }
+        }
+        if (_excludedAccounts.length > 0) {
+            emit ExcludedFromSupply(_excludedAccounts);
         }
 
         emit MembershipContractAnnounced({definingContract: address(_token)});

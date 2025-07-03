@@ -42,7 +42,7 @@ contract TokenVotingTest is TestBase {
 
     SimpleBuilder builder;
 
-    event ExcludedFromSupply(address account);
+    event ExcludedFromSupply(address[] accounts);
 
     error NoVotingPower();
 
@@ -235,19 +235,23 @@ contract TokenVotingTest is TestBase {
                 minProposerVotingPower: 0
             });
             uint256 minApprovals = 1_000_000; // 100%
-            bytes memory metadata = "";
 
-            vm.expectEmit();
-            emit ExcludedFromSupply(alice);
-            myPlugin.initialize(
-                dao,
-                settings,
-                token,
-                IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call),
-                minApprovals,
-                metadata,
-                excluded
-            );
+            {
+                address[] memory addrs = new address[](1);
+                addrs[0] = alice;
+
+                vm.expectEmit();
+                emit ExcludedFromSupply(addrs);
+                myPlugin.initialize(
+                    dao,
+                    settings,
+                    token,
+                    IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call),
+                    minApprovals,
+                    "",
+                    excluded
+                );
+            }
 
             dao.grant(address(myPlugin), alice, myPlugin.CREATE_PROPOSAL_PERMISSION_ID());
 
@@ -538,7 +542,7 @@ contract TokenVotingTest is TestBase {
         dao.grant(address(plugin), address(this), keccak256("CREATE_PROPOSAL_PERMISSION"));
 
         vm.expectRevert(NoVotingPower.selector);
-        uint256 proposalId = plugin.createProposal("meta", new Action[](0), 0, 0, "");
+        plugin.createProposal("meta", new Action[](0), 0, 0, "");
     }
 
     function test_WhenCallingTotalVotingPowerWithMultipleAccountsInTheExcludedList() external givenAccountExclusion {
