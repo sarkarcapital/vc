@@ -581,7 +581,7 @@ contract TokenVotingSetupTest is TestBase {
         assertEq(token.delegates(david), address(0));
 
         TokenVoting plugin = TokenVoting(pluginAddr);
-        assertEq(plugin.totalVotingPower(block.number - 1), 0);
+        assertEq(plugin.totalVotingPower(block.number - 1), 4 ether);
     }
 
     function test_WhenCallingPrepareInstallationToUseAnExistingTokenWithAListOfExcludedAccounts()

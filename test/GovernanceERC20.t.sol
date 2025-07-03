@@ -842,6 +842,41 @@ contract GovernanceERC20Test is TestBase {
 
         assertEq(token.totalSupply(), 40 ether);
         assertEq(token.getPastTotalSupply(block.number - 1), 40 ether);
+
+        // Transfer tokens
+        address someRecipient = makeAddr("some-wallet");
+
+        vm.prank(alice);
+        token.transfer(someRecipient, 10 ether);
+        vm.prank(bob);
+        token.transfer(someRecipient, 10 ether);
+        vm.prank(carol);
+        token.transfer(someRecipient, 10 ether);
+        vm.prank(david);
+        token.transfer(someRecipient, 10 ether);
+
+        vm.roll(block.number + 1);
+
+        assertEq(token.balanceOf(alice), 0);
+        assertEq(token.balanceOf(bob), 0);
+        assertEq(token.balanceOf(carol), 0);
+        assertEq(token.balanceOf(david), 0);
+        assertEq(token.balanceOf(someRecipient), 40 ether);
+
+        assertEq(token.getVotes(alice), 0);
+        assertEq(token.getVotes(bob), 0);
+        assertEq(token.getVotes(carol), 0);
+        assertEq(token.getVotes(david), 0);
+        assertEq(token.getVotes(someRecipient), 0);
+
+        assertEq(token.getPastVotes(alice, block.number - 1), 0);
+        assertEq(token.getPastVotes(bob, block.number - 1), 0);
+        assertEq(token.getPastVotes(carol, block.number - 1), 0);
+        assertEq(token.getPastVotes(david, block.number - 1), 0);
+        assertEq(token.getPastVotes(someRecipient, block.number - 1), 0);
+
+        assertEq(token.totalSupply(), 40 ether);
+        assertEq(token.getPastTotalSupply(block.number - 1), 40 ether);
     }
 
     function test_endToEndMintingWithoutSelfDelegation() external givenMintingIsAllowed {
@@ -880,7 +915,7 @@ contract GovernanceERC20Test is TestBase {
         assertEq(token.getPastVotes(carol, block.number - 1), 0);
         assertEq(token.getPastVotes(david, block.number - 1), 0);
 
-        assertEq(token.totalSupply(), 0);
-        assertEq(token.getPastTotalSupply(block.number - 1), 0);
+        assertEq(token.totalSupply(), 40 ether);
+        assertEq(token.getPastTotalSupply(block.number - 1), 40 ether);
     }
 }
