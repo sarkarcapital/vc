@@ -803,4 +803,84 @@ contract GovernanceERC20Test is TestBase {
         vm.prank(bob);
         token.freezeMinting();
     }
+
+    function test_endToEndMintingWithSelfDelegation() external givenMintingIsAllowed {
+        // It Should mint properly
+        token = new GovernanceERC20(
+            dao,
+            TOKEN_NAME,
+            TOKEN_SYMBOL,
+            GovernanceERC20.MintSettings({
+                receivers: new address[](0),
+                amounts: new uint256[](0),
+                ensureDelegationOnMint: true
+            })
+        );
+        dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
+
+        token.mint(alice, 10 ether);
+        token.mint(bob, 10 ether);
+        token.mint(carol, 10 ether);
+        token.mint(david, 10 ether);
+
+        vm.roll(block.number + 1);
+
+        assertEq(token.balanceOf(alice), 10 ether);
+        assertEq(token.balanceOf(bob), 10 ether);
+        assertEq(token.balanceOf(carol), 10 ether);
+        assertEq(token.balanceOf(david), 10 ether);
+
+        assertEq(token.getVotes(alice), 10 ether);
+        assertEq(token.getVotes(bob), 10 ether);
+        assertEq(token.getVotes(carol), 10 ether);
+        assertEq(token.getVotes(david), 10 ether);
+
+        assertEq(token.getPastVotes(alice, block.number - 1), 10 ether);
+        assertEq(token.getPastVotes(bob, block.number - 1), 10 ether);
+        assertEq(token.getPastVotes(carol, block.number - 1), 10 ether);
+        assertEq(token.getPastVotes(david, block.number - 1), 10 ether);
+
+        assertEq(token.totalSupply(), 40 ether);
+        assertEq(token.getPastTotalSupply(block.number - 1), 40 ether);
+    }
+
+    function test_endToEndMintingWithoutSelfDelegation() external givenMintingIsAllowed {
+        // It Should mint properly
+        token = new GovernanceERC20(
+            dao,
+            TOKEN_NAME,
+            TOKEN_SYMBOL,
+            GovernanceERC20.MintSettings({
+                receivers: new address[](0),
+                amounts: new uint256[](0),
+                ensureDelegationOnMint: false
+            })
+        );
+        dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
+
+        token.mint(alice, 10 ether);
+        token.mint(bob, 10 ether);
+        token.mint(carol, 10 ether);
+        token.mint(david, 10 ether);
+
+        vm.roll(block.number + 1);
+
+        assertEq(token.balanceOf(alice), 10 ether);
+        assertEq(token.balanceOf(bob), 10 ether);
+        assertEq(token.balanceOf(carol), 10 ether);
+        assertEq(token.balanceOf(david), 10 ether);
+
+        assertEq(token.getVotes(alice), 0);
+        assertEq(token.getVotes(bob), 0);
+        assertEq(token.getVotes(carol), 0);
+        assertEq(token.getVotes(david), 0);
+
+        assertEq(token.getPastVotes(alice, block.number - 1), 0);
+        assertEq(token.getPastVotes(bob, block.number - 1), 0);
+        assertEq(token.getPastVotes(carol, block.number - 1), 0);
+        assertEq(token.getPastVotes(david, block.number - 1), 0);
+
+        assertEq(token.totalSupply(), 0);
+        assertEq(token.getPastTotalSupply(block.number - 1), 0);
+    }
 }
