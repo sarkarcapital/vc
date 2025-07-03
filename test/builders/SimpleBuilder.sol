@@ -35,7 +35,7 @@ contract SimpleBuilder is TestBase {
     uint256 minApprovals;
     bytes pluginMetadata;
     address[] excludedAccounts;
-    bool selfDelegateOnMint;
+    bool selfDelegateOnMint = true;
 
     constructor() {
         // Set the caller as the initial daoOwner
@@ -124,8 +124,13 @@ contract SimpleBuilder is TestBase {
         return this;
     }
 
-    function withSelfDelegateOnMint() public returns (SimpleBuilder) {
+    function withSelfDelegationOnMint() public returns (SimpleBuilder) {
         selfDelegateOnMint = true;
+        return this;
+    }
+
+    function withoutSelfDelegationOnMint() public returns (SimpleBuilder) {
+        selfDelegateOnMint = false;
         return this;
     }
 
