@@ -42,6 +42,8 @@ contract TokenVotingTest is TestBase {
 
     SimpleBuilder builder;
 
+    event ExcludedFromSupply(address account);
+
     error NoVotingPower();
 
     modifier givenInTheInitializeContext() {
@@ -187,6 +189,7 @@ contract TokenVotingTest is TestBase {
 
     function test_WhenCallingInitializeWithAListOfExcludedAccounts() external givenInTheInitializeContext {
         // It Should correctly add all provided addresses to the excludedAccounts set
+        // It Should emit an event
         // It Should allow an empty list of excluded accounts
 
         address[] memory holders = new address[](2);
@@ -234,6 +237,8 @@ contract TokenVotingTest is TestBase {
             uint256 minApprovals = 1_000_000; // 100%
             bytes memory metadata = "";
 
+            vm.expectEmit();
+            emit ExcludedFromSupply(alice);
             myPlugin.initialize(
                 dao,
                 settings,

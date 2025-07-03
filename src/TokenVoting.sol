@@ -32,13 +32,16 @@ contract TokenVoting is IMembership, MajorityVotingBase {
 
     /// @notice An [OpenZeppelin `Votes`](https://docs.openzeppelin.com/contracts/4.x/api/governance#Votes)
     ///         compatible contract referencing the token being used for voting.
-    IVotesUpgradeable private votingToken; // Storage slot 1
+    IVotesUpgradeable private votingToken; // Slot 0
 
     /// @notice Wether the token contract indexes past voting power by timestamp.
-    bool private tokenIndexedByTimestamp; // Storage slot 1
+    bool private tokenIndexedByTimestamp; // Slot 0
 
     /// @notice The list of addresses excluded from voting
-    EnumerableSet.AddressSet internal excludedAccounts; // Storage slot 2
+    EnumerableSet.AddressSet internal excludedAccounts; // Slot 1
+
+    /// @notice Emitted when an account's balance is considered as non-circulating supply. Its balance will be excluded from the token supply computation.
+    event ExcludedFromSupply(address account);
 
     /// @notice Thrown if the voting power is zero
     error NoVotingPower();
@@ -77,6 +80,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
 
         for (uint256 i; i < _excludedAccounts.length;) {
             excludedAccounts.add(_excludedAccounts[i]);
+            emit ExcludedFromSupply(_excludedAccounts[i]);
 
             unchecked {
                 ++i;
