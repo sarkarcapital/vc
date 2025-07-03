@@ -112,6 +112,88 @@ contract GovernanceERC20Test is TestBase {
         new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
     }
 
+    modifier givenTheContractIsBeingDeployedWithSpecificMintSettings() {
+        _;
+    }
+
+    modifier givenTheEnsureDelegationOnMintFlagIsSetToTrue() {
+        address[] memory receivers = new address[](3);
+        receivers[0] = alice;
+        receivers[1] = bob;
+        receivers[2] = carol;
+
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = 100 ether;
+        amounts[1] = 200 ether;
+        amounts[2] = 300 ether;
+
+        GovernanceERC20.MintSettings memory mintSettings =
+            GovernanceERC20.MintSettings({receivers: receivers, amounts: amounts, ensureDelegationOnMint: true});
+        token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
+
+        _;
+    }
+
+    function test_WhenDeployingWithInitialBalances()
+        external
+        givenTheContractIsBeingDeployedWithSpecificMintSettings
+        givenTheEnsureDelegationOnMintFlagIsSetToTrue
+    {
+        // It self-delegates for all initial receivers
+
+        vm.roll(block.number + 1);
+
+        assertEq(token.delegates(alice), alice);
+        assertEq(token.delegates(bob), bob);
+        assertEq(token.delegates(carol), carol);
+
+        assertEq(token.getVotes(alice), 100 ether);
+        assertEq(token.getVotes(bob), 200 ether);
+        assertEq(token.getVotes(carol), 300 ether);
+
+        assertEq(token.totalSupply(), 600 ether);
+        assertEq(token.getPastTotalSupply(block.number - 1), 600 ether);
+    }
+
+    modifier givenTheEnsureDelegationOnMintFlagIsSetToFalse() {
+        address[] memory receivers = new address[](3);
+        receivers[0] = alice;
+        receivers[1] = bob;
+        receivers[2] = carol;
+
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = 100 ether;
+        amounts[1] = 200 ether;
+        amounts[2] = 300 ether;
+
+        GovernanceERC20.MintSettings memory mintSettings =
+            GovernanceERC20.MintSettings({receivers: receivers, amounts: amounts, ensureDelegationOnMint: false});
+        token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
+
+        _;
+    }
+
+    function test_WhenDeployingWithInitialBalances2()
+        external
+        givenTheContractIsBeingDeployedWithSpecificMintSettings
+        givenTheEnsureDelegationOnMintFlagIsSetToFalse
+    {
+        // It does not delegate for any initial receivers
+
+        vm.roll(block.number + 1);
+
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.delegates(bob), address(0));
+        assertEq(token.delegates(carol), address(0));
+
+        assertEq(token.getVotes(alice), 0);
+        assertEq(token.getVotes(bob), 0);
+        assertEq(token.getVotes(carol), 0);
+
+        assertEq(token.totalSupply(), 600 ether);
+        assertEq(token.getPastTotalSupply(block.number - 1), 600 ether);
+    }
+
     modifier givenTheContractIsDeployed() {
         GovernanceERC20.MintSettings memory emptyMintSettings = GovernanceERC20.MintSettings({
             receivers: new address[](0),
@@ -263,9 +345,304 @@ contract GovernanceERC20Test is TestBase {
             ensureDelegationOnMint: true
         });
         token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
+
         // Grant mint permission to the test contract
         dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
         _;
+    }
+
+    modifier givenTheReceiverTurnedDelegationOff() {
+        // Bob then manually turns off delegation
+        vm.prank(bob);
+        token.delegate(address(0));
+
+        _;
+    }
+
+    function test_WhenMintingTokensToTheReceiver()
+        external
+        givenATokenIsDeployedAndTheMainSignerCanMint
+        givenTheReceiverTurnedDelegationOff
+    {
+        // It self-delegates the receiver's voting power
+
+        token.mint(alice, 10 ether);
+        token.mint(bob, 10 ether);
+        token.mint(carol, 10 ether);
+
+        assertEq(token.delegates(alice), alice);
+        assertEq(token.delegates(bob), bob);
+        assertEq(token.delegates(carol), carol);
+        assertEq(token.delegates(david), address(0));
+
+        assertEq(token.balanceOf(alice), 10 ether);
+        assertEq(token.balanceOf(bob), 10 ether);
+        assertEq(token.balanceOf(carol), 10 ether);
+        assertEq(token.balanceOf(david), 0);
+
+        assertEq(token.getVotes(alice), 10 ether);
+        assertEq(token.getVotes(bob), 10 ether);
+        assertEq(token.getVotes(carol), 10 ether);
+        assertEq(token.getVotes(david), 0);
+    }
+
+    modifier givenTheContractWasDeployedWithEnsureDelegationOnMintAsTrue() {
+        GovernanceERC20.MintSettings memory mintSettings = GovernanceERC20.MintSettings({
+            receivers: new address[](0),
+            amounts: new uint256[](0),
+            ensureDelegationOnMint: true
+        });
+        token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
+
+        // Grant mint permission to the test contract
+        dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
+
+        _;
+    }
+
+    modifier givenTheReceiverHasAlreadyDelegatedToAnotherAccount() {
+        vm.prank(bob);
+        token.delegate(david);
+
+        _;
+    }
+
+    modifier givenTheReceiverHasNeverHadADelegate() {
+        _;
+    }
+
+    function test_WhenMintingTokensToTheReceiver2()
+        external
+        givenTheContractWasDeployedWithEnsureDelegationOnMintAsTrue
+        givenTheReceiverHasAlreadyDelegatedToAnotherAccount
+    {
+        // It does not change the existing delegation
+
+        token.mint(alice, 10 ether);
+        token.mint(bob, 5 ether);
+
+        assertEq(token.delegates(alice), alice);
+        assertEq(token.delegates(bob), david);
+
+        assertEq(token.balanceOf(alice), 10 ether);
+        assertEq(token.balanceOf(bob), 5 ether);
+
+        assertEq(token.getVotes(alice), 10 ether);
+        assertEq(token.getVotes(bob), 0);
+        assertEq(token.getVotes(david), 5 ether);
+    }
+
+    modifier givenTheReceiverHasManuallyDelegatedToAddress0() {
+        vm.prank(bob);
+        token.delegate(david);
+        vm.prank(bob);
+        token.delegate(address(0));
+
+        _;
+    }
+
+    function test_WhenMintingTokensToTheReceiver3()
+        external
+        givenTheContractWasDeployedWithEnsureDelegationOnMintAsTrue
+        givenTheReceiverHasManuallyDelegatedToAddress0
+    {
+        // It self-delegates the receiver, overwriting the address(0) delegation
+
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.delegates(bob), address(0));
+
+        token.mint(alice, 10 ether);
+        token.mint(bob, 5 ether);
+
+        assertEq(token.delegates(alice), alice);
+        assertEq(token.delegates(bob), bob);
+
+        assertEq(token.balanceOf(alice), 10 ether);
+        assertEq(token.balanceOf(bob), 5 ether);
+
+        assertEq(token.getVotes(alice), 10 ether);
+        assertEq(token.getVotes(bob), 5 ether);
+    }
+
+    modifier givenTheContractWasDeployedWithEnsureDelegationOnMintAsFalse() {
+        GovernanceERC20.MintSettings memory mintSettings = GovernanceERC20.MintSettings({
+            receivers: new address[](0),
+            amounts: new uint256[](0),
+            ensureDelegationOnMint: false
+        });
+        token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
+
+        // Grant mint permission to the test contract
+        dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
+
+        _;
+    }
+
+    modifier givenTheReceiverHasNeverHadADelegate2() {
+        _;
+    }
+
+    function test_WhenMintingTokensToTheReceiver4()
+        external
+        givenTheContractWasDeployedWithEnsureDelegationOnMintAsFalse
+        givenTheReceiverHasNeverHadADelegate2
+    {
+        // It does NOT self-delegate the receiver's voting power
+
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.delegates(bob), address(0));
+
+        token.mint(alice, 10 ether);
+        token.mint(bob, 5 ether);
+
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.delegates(bob), address(0));
+
+        assertEq(token.balanceOf(alice), 10 ether);
+        assertEq(token.balanceOf(bob), 5 ether);
+
+        assertEq(token.getVotes(alice), 0);
+        assertEq(token.getVotes(bob), 0);
+    }
+
+    modifier givenTheReceiverHasAlreadyDelegatedToAnotherAccount2() {
+        vm.prank(bob);
+        token.delegate(david);
+
+        _;
+    }
+
+    function test_WhenMintingTokensToTheReceiver5()
+        external
+        givenTheContractWasDeployedWithEnsureDelegationOnMintAsFalse
+        givenTheReceiverHasAlreadyDelegatedToAnotherAccount2
+    {
+        // It does not change the existing delegation
+
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.delegates(bob), david);
+
+        token.mint(alice, 10 ether);
+        token.mint(bob, 5 ether);
+
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.delegates(bob), david);
+
+        assertEq(token.balanceOf(alice), 10 ether);
+        assertEq(token.balanceOf(bob), 5 ether);
+
+        assertEq(token.getVotes(alice), 0);
+        assertEq(token.getVotes(bob), 0);
+    }
+
+    modifier givenTheContractIsDeployed3() {
+        _;
+    }
+
+    modifier givenTheEnsureDelegationOnMintFlagIsTrue() {
+        GovernanceERC20.MintSettings memory mintSettings = GovernanceERC20.MintSettings({
+            receivers: new address[](0),
+            amounts: new uint256[](0),
+            ensureDelegationOnMint: true
+        });
+        token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
+
+        // Grant mint permission to the test contract
+        dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
+
+        _;
+    }
+
+    function test_WhenTransferringTokensToANewAddress()
+        external
+        givenTheContractIsDeployed3
+        givenTheEnsureDelegationOnMintFlagIsTrue
+    {
+        // It does NOT trigger self-delegation
+
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.delegates(bob), address(0));
+
+        token.mint(alice, 10 ether);
+        token.mint(bob, 5 ether);
+
+        assertEq(token.delegates(alice), alice);
+        assertEq(token.delegates(bob), bob);
+
+        assertEq(token.balanceOf(alice), 10 ether);
+        assertEq(token.balanceOf(bob), 5 ether);
+
+        assertEq(token.getVotes(alice), 10 ether);
+        assertEq(token.getVotes(bob), 5 ether);
+
+        // Transfer
+        vm.prank(bob);
+        token.transfer(david, 5 ether);
+
+        assertEq(token.delegates(alice), alice);
+        assertEq(token.delegates(bob), bob);
+        assertEq(token.delegates(david), address(0));
+
+        assertEq(token.balanceOf(alice), 10 ether);
+        assertEq(token.balanceOf(bob), 0);
+        assertEq(token.balanceOf(david), 5 ether);
+
+        assertEq(token.getVotes(alice), 10 ether);
+        assertEq(token.getVotes(bob), 0);
+        assertEq(token.getVotes(david), 0);
+    }
+
+    modifier givenTheEnsureDelegationOnMintFlagIsFalse() {
+        GovernanceERC20.MintSettings memory mintSettings = GovernanceERC20.MintSettings({
+            receivers: new address[](0),
+            amounts: new uint256[](0),
+            ensureDelegationOnMint: false
+        });
+        token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
+
+        // Grant mint permission to the test contract
+        dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
+
+        _;
+    }
+
+    function test_WhenTransferringTokensToANewAddress2()
+        external
+        givenTheContractIsDeployed3
+        givenTheEnsureDelegationOnMintFlagIsFalse
+    {
+        // It does NOT trigger self-delegation
+
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.delegates(bob), address(0));
+
+        token.mint(alice, 10 ether);
+        token.mint(bob, 5 ether);
+
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.delegates(bob), address(0));
+
+        assertEq(token.balanceOf(alice), 10 ether);
+        assertEq(token.balanceOf(bob), 5 ether);
+
+        assertEq(token.getVotes(alice), 0);
+        assertEq(token.getVotes(bob), 0);
+
+        // Transfer
+        vm.prank(bob);
+        token.transfer(david, 5 ether);
+
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.delegates(bob), address(0));
+        assertEq(token.delegates(david), address(0));
+
+        assertEq(token.balanceOf(alice), 10 ether);
+        assertEq(token.balanceOf(bob), 0);
+        assertEq(token.balanceOf(david), 5 ether);
+
+        assertEq(token.getVotes(alice), 0);
+        assertEq(token.getVotes(bob), 0);
+        assertEq(token.getVotes(david), 0);
     }
 
     function test_WhenMintingTokensToAnAddressForTheFirstTime() external givenATokenIsDeployedAndTheMainSignerCanMint {
@@ -313,9 +690,11 @@ contract GovernanceERC20Test is TestBase {
         token.mint(alice, 100 ether);
         // Mint to Bob so he self-delegates (as per modifier setup)
         token.mint(bob, 50 ether);
+
         // Bob then manually turns off delegation
         vm.prank(bob);
         token.delegate(address(0));
+
         _;
     }
 
@@ -331,7 +710,7 @@ contract GovernanceERC20Test is TestBase {
         assertEq(token.getVotes(bob), 0);
     }
 
-    function test_WhenMintingTokensToTheReceiver()
+    function test_WhenMintingTokensToTheReceiver6()
         external
         givenATokenIsDeployedAndTheMainSignerCanMint
         givenTheReceiverHasManuallyTurnedOffDelegation

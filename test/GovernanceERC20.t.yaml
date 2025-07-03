@@ -14,6 +14,20 @@ GovernanceERC20Test:
         then:
           - it: reverts if the `receivers` and `amounts` array lengths in the mint settings mismatch
 
+  - given: The contract is being deployed with specific mint settings
+    comment: "initialize with ensureDelegationOnMint"
+    and:
+      - given: The `ensureDelegationOnMint` flag is set to true
+        and:
+          - when: Deploying with initial balances
+            then:
+              - it: self-delegates for all initial receivers
+      - given: The `ensureDelegationOnMint` flag is set to false
+        and:
+          - when: Deploying with initial balances
+            then:
+              - it: does not delegate for any initial receivers
+
   - given: The contract is deployed
     comment: "ERC-165"
     and:
@@ -50,6 +64,53 @@ GovernanceERC20Test:
       - when: Delegating voting power multiple times
         then:
           - it: is checkpointed
+
+  - given: The contract was deployed with `ensureDelegationOnMint` as true
+    comment: "Delegation on mint"
+    and:
+      - given: The receiver has never had a delegate
+        and:
+          - when: Minting tokens to the receiver
+            then:
+              - it: self-delegates the receiver's voting power
+      - given: The receiver has already delegated to another account
+        and:
+          - when: Minting tokens to the receiver
+            then:
+              - it: does not change the existing delegation
+      - given: The receiver has manually delegated to address(0)
+        and:
+          - when: Minting tokens to the receiver
+            then:
+              - it: self-delegates the receiver, overwriting the address(0) delegation
+
+  - given: The contract was deployed with `ensureDelegationOnMint` as false
+    comment: "Delegation on mint"
+    and:
+      - given: The receiver has never had a delegate
+        and:
+          - when: Minting tokens to the receiver
+            then:
+              - it: does NOT self-delegate the receiver's voting power
+      - given: The receiver has already delegated to another account
+        and:
+          - when: Minting tokens to the receiver
+            then:
+              - it: does not change the existing delegation
+
+  - given: The contract is deployed
+    comment: "Delegation on transfer (regression)"
+    and:
+      - given: The `ensureDelegationOnMint` flag is true
+        and:
+          - when: Transferring tokens to a new address
+            then:
+              - it: does NOT trigger self-delegation
+      - given: The `ensureDelegationOnMint` flag is false
+        and:
+          - when: Transferring tokens to a new address
+            then:
+              - it: does NOT trigger self-delegation
 
   - given: A token is deployed and the main signer can mint
     comment: "afterTokenTransfer"
