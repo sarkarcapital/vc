@@ -39,13 +39,18 @@ contract GovernanceERC20 is
     /// @notice Whether mint() has been permanently disabled.
     bool public mintingFrozen;
 
+    /// @notice Whether mint() should enable self delegation if the receiver has no delegate.
+    bool public ensureDelegationOnMint;
+
     /// @notice The settings for the initial mint of the token.
-    /// @param receivers The receivers of the tokens.
-    /// @param amounts The amounts of tokens to be minted for each receiver.
+    /// @param receivers The receivers of the tokens. On initialization only.
+    /// @param amounts The amounts of tokens to be minted for each receiver. On initialization only.
+    /// @param ensureDelegationOnMint Whether mint() calls should self delegate if the receiver doesn't have one.
     /// @dev The lengths of `receivers` and `amounts` must match.
     struct MintSettings {
         address[] receivers;
         uint256[] amounts;
+        bool ensureDelegationOnMint;
     }
 
     /// @notice Emitted when minting is frozen permanently
@@ -63,7 +68,7 @@ contract GovernanceERC20 is
     /// @param _dao The managing DAO.
     /// @param _name The name of the [ERC-20](https://eips.ethereum.org/EIPS/eip-20) governance token.
     /// @param _symbol The symbol of the [ERC-20](https://eips.ethereum.org/EIPS/eip-20) governance token.
-    /// @param _mintSettings The token mint settings struct containing the `receivers` and `amounts`.
+    /// @param _mintSettings The token mint settings struct containing the `receivers`, the `amounts` and `ensureDelegationOnMint`.
     constructor(IDAO _dao, string memory _name, string memory _symbol, MintSettings memory _mintSettings) {
         initialize(_dao, _name, _symbol, _mintSettings);
     }
@@ -72,7 +77,7 @@ contract GovernanceERC20 is
     /// @param _dao The managing DAO.
     /// @param _name The name of the [ERC-20](https://eips.ethereum.org/EIPS/eip-20) governance token.
     /// @param _symbol The symbol of the [ERC-20](https://eips.ethereum.org/EIPS/eip-20) governance token.
-    /// @param _mintSettings The token mint settings struct containing the `receivers` and `amounts`.
+    /// @param _mintSettings The token mint settings struct containing the `receivers`, the `amounts` and `ensureDelegationOnMint`.
     function initialize(IDAO _dao, string memory _name, string memory _symbol, MintSettings memory _mintSettings)
         public
         initializer
@@ -89,8 +94,15 @@ contract GovernanceERC20 is
         __ERC20Permit_init(_name);
         __DaoAuthorizableUpgradeable_init(_dao);
 
+        // Mint
+        ensureDelegationOnMint = _mintSettings.ensureDelegationOnMint;
+
         for (uint256 i; i < _mintSettings.receivers.length;) {
-            _mint(_mintSettings.receivers[i], _mintSettings.amounts[i]);
+            address receiver = _mintSettings.receivers[i];
+            if (_mintSettings.ensureDelegationOnMint) {
+                _delegate(receiver, receiver);
+            }
+            _mint(receiver, _mintSettings.amounts[i]);
 
             unchecked {
                 ++i;
@@ -117,6 +129,9 @@ contract GovernanceERC20 is
             revert MintingIsFrozen();
         }
 
+        if (ensureDelegationOnMint && delegates(to) == address(0)) {
+            _delegate(to, to);
+        }
         _mint(to, amount);
     }
 
@@ -126,16 +141,5 @@ contract GovernanceERC20 is
 
         mintingFrozen = true;
         emit MintingFrozen();
-    }
-
-    // https://forum.openzeppelin.com/t/self-delegation-in-erc20votes/17501/12?u=novaknole
-    /// @inheritdoc ERC20VotesUpgradeable
-    function _afterTokenTransfer(address from, address to, uint256 amount) internal override {
-        super._afterTokenTransfer(from, to, amount);
-
-        // Automatically turn on delegation on mint/transfer but only for the first time.
-        if (to != address(0) && numCheckpoints(to) == 0 && delegates(to) == address(0)) {
-            _delegate(to, to);
-        }
     }
 }
