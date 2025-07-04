@@ -1,5 +1,5 @@
 GovernanceERC20Test:
-  - given: The contract is deployed with default mint settings
+  - given: The contract is being deployed with default mint settings
     and:
       - when: Calling initialize() again
         then:

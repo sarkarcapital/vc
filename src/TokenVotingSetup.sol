@@ -111,17 +111,19 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
             IPlugin.TargetConfig memory targetConfig;
             uint256 minApprovals;
             bytes memory pluginMetadata;
+            address[] memory excludedAccounts;
 
             // Decode `_data` to extract the params needed for deploying and initializing `TokenVoting` plugin,
             // and the required helpers
             (
                 votingSettings,
                 tokenSettings,
-                // only used for GovernanceERC20(token is not passed)
+                // Used for GovernanceERC20, when no token is passed
                 mintSettings,
                 targetConfig,
                 minApprovals,
-                pluginMetadata
+                pluginMetadata,
+                excludedAccounts
             ) = decodeInstallationParameters(_data);
 
             token = tokenSettings.addr;
@@ -156,7 +158,15 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
             plugin = address(tokenVotingBase).deployUUPSProxy(
                 abi.encodeCall(
                     TokenVoting.initialize,
-                    (IDAO(_dao), votingSettings, IVotesUpgradeable(token), targetConfig, minApprovals, pluginMetadata)
+                    (
+                        IDAO(_dao),
+                        votingSettings,
+                        IVotesUpgradeable(token),
+                        targetConfig,
+                        minApprovals,
+                        pluginMetadata,
+                        excludedAccounts
+                    )
                 )
             );
 
@@ -362,9 +372,12 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
         GovernanceERC20.MintSettings memory mintSettings,
         IPlugin.TargetConfig memory targetConfig,
         uint256 minApprovals,
-        bytes memory pluginMetadata
+        bytes memory pluginMetadata,
+        address[] memory excludedAccounts
     ) external pure returns (bytes memory) {
-        return abi.encode(votingSettings, tokenSettings, mintSettings, targetConfig, minApprovals, pluginMetadata);
+        return abi.encode(
+            votingSettings, tokenSettings, mintSettings, targetConfig, minApprovals, pluginMetadata, excludedAccounts
+        );
     }
 
     /// @notice Decodes the given byte array into the original installation parameters
@@ -378,7 +391,8 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
             GovernanceERC20.MintSettings memory mintSettings,
             IPlugin.TargetConfig memory targetConfig,
             uint256 minApprovals,
-            bytes memory pluginMetadata
+            bytes memory pluginMetadata,
+            address[] memory excludedAccounts
         )
     {
         return abi.decode(
@@ -389,7 +403,8 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
                 GovernanceERC20.MintSettings,
                 IPlugin.TargetConfig,
                 uint256,
-                bytes
+                bytes,
+                address[]
             )
         );
     }

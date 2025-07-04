@@ -13,6 +13,7 @@ UpgradingTest:
           - it: protocol versions are updated correctly
           - it: new settings are applied
           - it: the original `initialize` function is disabled post-upgrade
+          - it: Should detect the token clock
 
   - given: The contract is at R1 B2
     and:
@@ -24,3 +25,16 @@ UpgradingTest:
           - it: protocol versions are updated correctly
           - it: new settings are applied
           - it: the original `initialize` function is disabled post-upgrade
+          - it: Should detect the token clock
+
+  - given: The contract is at R1 B3
+    and:
+      - when: Upgrading with `initializeFrom`
+        then:
+          - it: upgrades from R1 B3 with `initializeFrom`
+          - it: The old `initialize` function fails during the upgrade
+          - it: initializeFrom succeeds
+          - it: protocol versions are updated correctly
+          - it: settings remain
+          - it: the original `initialize` function is disabled post-upgrade
+          - it: Should detect the token clock

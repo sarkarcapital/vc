@@ -2,10 +2,6 @@ TokenVotingSetupZkSyncTest:
   - when: Calling supportsInterface('0xffffffff')
     then:
       - it: does not support the empty interface
-  - when: Calling governanceERC20Base() and governanceWrappedERC20Base() after initialization
-    comment: This test is skipped if the network is ZkSync
-    then:
-      - it: stores the bases provided through the constructor
   - given: The context is prepareInstallation
     and:
       - when: Calling prepareInstallation with data that is empty or not of minimum length
@@ -35,6 +31,30 @@ TokenVotingSetupZkSyncTest:
       - when: Calling prepareInstallation and a token address is not passed
         then:
           - it: correctly sets up the plugin and helpers, when a token address is not passed
+
+      - given: Creating a new token
+        and:
+          - when: The list of excluded accounts is not empty
+            then:
+              - it: Should prepare initialization data for the new GovernanceERC20 token that includes the excluded accounts for self-delegation
+              - it: Should prepare initialization data for the TokenVoting plugin that includes the same list of excluded accounts
+          - when: The list of excluded accounts is empty
+            then:
+              - it: Should prepare initialization data for both the token and plugin with an empty list of excluded accounts
+      - when: Calling prepareInstallation() to use an existing token with a list of excluded accounts
+        then:
+          - it: Should prepare initialization data for the TokenVoting plugin that includes the list of excluded accounts
+          - it: Should not attempt to modify the existing token
+
+      - given: A set of installation parameters including a list of excluded accounts
+        and:
+          - when: Calling encodeInstallationParameters()
+            then:
+              - it: Should produce a byte string containing all parameters, including the excluded accounts
+          - when: Calling decodeInstallationParameters() on the encoded byte string
+            then:
+              - it: Should correctly decode all original parameters, including the full list of excluded accounts
+
   - given: The context is prepareUpdate
     and:
       - when: Calling prepareUpdate for an update from build 1
@@ -64,7 +84,6 @@ TokenVotingSetupZkSyncTest:
           - it: Should return the original installation parameters
 
   - given: The installation request is for a new token
-    comment: The token address in TokenSettings is address(0)
     and:
       - when: Calling prepareInstallation()
         then:

@@ -25,6 +25,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {ERC20ClockMock, ERC20NoClockMock} from "./mocks/ERC20ClockMock.sol";
 import {ProxyLib} from "@aragon/osx-commons-contracts/src/utils/deployment/ProxyLib.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract TokenVotingTest is TestBase {
     // Convenience aliases
@@ -40,6 +41,10 @@ contract TokenVotingTest is TestBase {
     VotingPowerCondition condition;
 
     SimpleBuilder builder;
+
+    event ExcludedFromSupply(address[] accounts);
+
+    error NoVotingPower();
 
     modifier givenInTheInitializeContext() {
         // Setup shared across initialize tests
@@ -64,7 +69,8 @@ contract TokenVotingTest is TestBase {
             token,
             IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call),
             0,
-            ""
+            "",
+            new address[](0)
         );
     }
 
@@ -92,7 +98,13 @@ contract TokenVotingTest is TestBase {
         emit IMembership.MembershipContractAnnounced(address(token));
 
         plugin.initialize(
-            dao, settings, token, IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call), minApprovals, metadata
+            dao,
+            settings,
+            token,
+            IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call),
+            minApprovals,
+            metadata,
+            new address[](0)
         );
 
         // THEN it sets the voting settings, token, minimal approval and metadata
@@ -173,6 +185,125 @@ contract TokenVotingTest is TestBase {
 
         (,, MajorityVotingBase.ProposalParameters memory parameters,,,,) = plugin.getProposal(proposalId);
         assertEq(parameters.snapshotTimepoint, 699);
+    }
+
+    function test_WhenCallingInitializeWithAListOfExcludedAccounts() external givenInTheInitializeContext {
+        // It Should correctly add all provided addresses to the excludedAccounts set
+        // It Should emit an event
+        // It Should allow an empty list of excluded accounts
+
+        address[] memory holders = new address[](2);
+        holders[0] = alice;
+        holders[1] = bob;
+        address[] memory excluded = new address[](1);
+        excluded[0] = alice;
+
+        uint256 proposalId;
+
+        {
+            // Simple flow
+            (dao, plugin, token,) = new SimpleBuilder().withNewToken(holders, 10 ether).withExcludedAccount(alice)
+                .withEarlyExecution().withMinApprovals(1_000_000)
+                // 100% approvals required
+                .build();
+            dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
+            dao.grant(address(plugin), bob, plugin.EXECUTE_PROPOSAL_PERMISSION_ID());
+
+            vm.prank(alice);
+            proposalId = plugin.createProposal("", new Action[](0), 0, 0, bytes(""));
+
+            vm.prank(bob);
+            plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, true);
+
+            (bool open, bool executed,,,,,) = plugin.getProposal(proposalId);
+            assertFalse(open);
+            assertTrue(executed);
+        }
+
+        // Manually initializing a plugin fork (to read minApprovals)
+        {
+            address base = address(new MyTokenVoting());
+            (dao,, token,) = new SimpleBuilder().withNewToken(holders, 10 ether).withExcludedAccount(alice).build();
+
+            address proxy = ProxyLib.deployUUPSProxy(base, "");
+            MyTokenVoting myPlugin = MyTokenVoting(proxy);
+            MajorityVotingBase.VotingSettings memory settings = MajorityVotingBase.VotingSettings({
+                votingMode: MajorityVotingBase.VotingMode.EarlyExecution,
+                supportThreshold: 400_000, // 40%
+                minParticipation: 200_000, // 20%
+                minDuration: ONE_DAY,
+                minProposerVotingPower: 0
+            });
+            uint256 minApprovals = 1_000_000; // 100%
+
+            {
+                address[] memory addrs = new address[](1);
+                addrs[0] = alice;
+
+                vm.expectEmit();
+                emit ExcludedFromSupply(addrs);
+                myPlugin.initialize(
+                    dao,
+                    settings,
+                    token,
+                    IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call),
+                    minApprovals,
+                    "",
+                    excluded
+                );
+            }
+
+            dao.grant(address(myPlugin), alice, myPlugin.CREATE_PROPOSAL_PERMISSION_ID());
+
+            vm.prank(alice);
+            proposalId = myPlugin.createProposal("", new Action[](0), 0, 0, bytes(""));
+
+            assertEq(myPlugin.getProposalMinApprovals(proposalId), 10 ether);
+        }
+    }
+
+    function test_WhenCallingInitializeWithDuplicateAddressesInTheExcludedAccountsList()
+        external
+        givenInTheInitializeContext
+    {
+        // It Should store each address only once in the excludedAccounts set
+
+        address[] memory holders = new address[](2);
+        holders[0] = alice;
+        holders[1] = bob;
+        address[] memory excluded = new address[](5);
+        excluded[0] = alice;
+        excluded[1] = alice;
+        excluded[2] = alice;
+        excluded[3] = alice;
+        excluded[4] = alice;
+
+        address base = address(new MyTokenVoting());
+        (dao,, token,) = new SimpleBuilder().withNewToken(holders, 10 ether).withExcludedAccount(alice).build();
+
+        address proxy = ProxyLib.deployUUPSProxy(base, "");
+        MyTokenVoting myPlugin = MyTokenVoting(proxy);
+        MajorityVotingBase.VotingSettings memory settings = MajorityVotingBase.VotingSettings({
+            votingMode: MajorityVotingBase.VotingMode.EarlyExecution,
+            supportThreshold: 400_000, // 40%
+            minParticipation: 200_000, // 20%
+            minDuration: ONE_DAY,
+            minProposerVotingPower: 0
+        });
+        uint256 minApprovals = 1_000_000; // 100%
+        bytes memory metadata = "";
+
+        myPlugin.initialize(
+            dao,
+            settings,
+            token,
+            IPlugin.TargetConfig(address(dao), IPlugin.Operation.Call),
+            minApprovals,
+            metadata,
+            excluded
+        );
+
+        assertEq(myPlugin.excludedAccountsLength(), 1);
     }
 
     modifier givenInTheERC165Context() {
@@ -315,6 +446,139 @@ contract TokenVotingTest is TestBase {
         assertFalse(executed, "Proposal should not be executed");
     }
 
+    modifier givenAccountExclusion() {
+        _;
+    }
+
+    function test_WhenCallingTotalVotingPowerWithNoAccountsInTheExcludedList() external givenAccountExclusion {
+        // It Should return the token's past total supply
+
+        address[] memory holders = new address[](4);
+        holders[0] = alice;
+        holders[1] = bob;
+        holders[2] = carol;
+        holders[3] = david;
+
+        (dao, plugin,,) = new SimpleBuilder().withNewToken(holders, 10 ether).build();
+
+        vm.roll(block.number + 1);
+        assertEq(plugin.totalVotingPower(block.number - 1), 40 ether);
+    }
+
+    modifier whenCallingTotalVotingPowerWithOneAccountInTheExcludedList() {
+        _;
+    }
+
+    function test_GivenTheExcludedAccountHasVotingPowerAtTheGivenTimepoint()
+        external
+        givenAccountExclusion
+        whenCallingTotalVotingPowerWithOneAccountInTheExcludedList
+    {
+        // It Should return the token's past total supply minus the past votes of the excluded accounts
+
+        address[] memory holders = new address[](4);
+        holders[0] = alice;
+        holders[1] = bob;
+        holders[2] = carol;
+        holders[3] = david;
+
+        (dao, plugin,,) = new SimpleBuilder().withNewToken(holders, 10 ether).withExcludedAccount(alice).build();
+
+        vm.roll(block.number + 1);
+        assertEq(plugin.totalVotingPower(block.number - 1), 30 ether);
+    }
+
+    modifier whenCreatingAProposal() {
+        _;
+    }
+
+    function test_GivenTheTotalVotingPowerAfterExcludingAccountsIsGreaterThan0()
+        external
+        givenAccountExclusion
+        whenCallingTotalVotingPowerWithOneAccountInTheExcludedList
+        whenCreatingAProposal
+    {
+        // It Should create the proposal successfully
+        // It Should calculate minVotingPower based on the effective total voting power (after exclusions)
+        // It Should calculate minApprovalPower based on the effective total voting power (after exclusions)
+
+        address[] memory holders = new address[](4);
+        holders[0] = alice;
+        holders[1] = bob;
+        holders[2] = carol;
+        holders[3] = david;
+
+        (dao, plugin,,) = new SimpleBuilder().withNewToken(holders, 10 ether).withMinParticipation(100_000)
+            .withMinApprovals(200_000).withExcludedAccount(alice).build();
+
+        vm.roll(block.number + 1);
+        assertEq(plugin.totalVotingPower(block.number - 1), 30 ether);
+
+        // Create proposal
+        dao.grant(address(plugin), address(this), keccak256("CREATE_PROPOSAL_PERMISSION"));
+        uint256 proposalId = plugin.createProposal("meta", new Action[](0), 0, 0, "");
+
+        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        assertEq(params.minVotingPower, 3 ether);
+    }
+
+    function test_GivenTheTotalVotingPowerAfterExcludingAccountsIs0()
+        external
+        givenAccountExclusion
+        whenCallingTotalVotingPowerWithOneAccountInTheExcludedList
+        whenCreatingAProposal
+    {
+        // It Should revert with NoVotingPower()
+
+        address[] memory holders = new address[](1);
+        holders[0] = alice;
+
+        (dao, plugin,,) = new SimpleBuilder().withNewToken(holders, 10 ether).withExcludedAccount(alice).build();
+
+        vm.roll(block.number + 1);
+        assertEq(plugin.totalVotingPower(block.number - 1), 0);
+
+        // Create proposal
+        dao.grant(address(plugin), address(this), keccak256("CREATE_PROPOSAL_PERMISSION"));
+
+        vm.expectRevert(NoVotingPower.selector);
+        plugin.createProposal("meta", new Action[](0), 0, 0, "");
+    }
+
+    function test_WhenCallingTotalVotingPowerWithMultipleAccountsInTheExcludedList() external givenAccountExclusion {
+        // It Should correctly subtract the past votes of all excluded accounts from the past total supply
+
+        address[] memory holders = new address[](4);
+        holders[0] = alice;
+        holders[1] = bob;
+        holders[2] = carol;
+        holders[3] = david;
+
+        (dao, plugin,,) = new SimpleBuilder().withNewToken(holders, 10 ether).withExcludedAccount(alice)
+            .withExcludedAccount(bob).withExcludedAccount(address(this)).build();
+
+        vm.roll(block.number + 1);
+        assertEq(plugin.totalVotingPower(block.number - 1), 20 ether);
+    }
+
+    function test_WhenCallingTotalVotingPowerWithAnExcludedAccountThatHasZeroVotingPowerAtTheTimepoint()
+        external
+        givenAccountExclusion
+    {
+        // It Should produce the same result as if the account was not excluded
+
+        address[] memory holders = new address[](4);
+        holders[0] = alice;
+        holders[1] = bob;
+        holders[2] = carol;
+        holders[3] = david;
+
+        (dao, plugin,,) = new SimpleBuilder().withNewToken(holders, 10 ether).withExcludedAccount(address(this)).build();
+
+        vm.roll(block.number + 1);
+        assertEq(plugin.totalVotingPower(block.number - 1), 40 ether);
+    }
+
     /// @dev Internal helper to create a proposal and return its ID.
     function _createDummyProposal(address _proposer) internal returns (uint256 proposalId) {
         vm.prank(_proposer);
@@ -355,6 +619,10 @@ contract TokenVotingTest is TestBase {
 
         uint256 proposalId = _createDummyProposal(carol);
         assertTrue(proposalId > 0, "Proposal should be created");
+    }
+
+    modifier givenMinProposerVotingPower02() {
+        _;
     }
 
     modifier givenMinProposerVotingPowerGreaterThan0() {
@@ -1555,5 +1823,17 @@ contract TokenVotingTest is TestBase {
 
     function test_WhenTestingWithAMagnitudeOf1066() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(66);
+    }
+}
+
+contract MyTokenVoting is TokenVoting {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
+    function getProposalMinApprovals(uint256 proposalId) public view returns (uint256) {
+        return proposals[proposalId].minApprovalPower;
+    }
+
+    function excludedAccountsLength() public view returns (uint256) {
+        return excludedAccounts.length();
     }
 }

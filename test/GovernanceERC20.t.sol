@@ -60,24 +60,28 @@ contract GovernanceERC20Test is TestBase {
         token = new GovernanceERC20(dao, TOKEN_NAME, TOKEN_SYMBOL, mintSettings);
     }
 
-    modifier givenTheContractIsDeployedWithDefaultMintSettings() {
+    modifier givenTheContractIsBeingDeployedWithDefaultMintSettings() {
         _;
     }
 
-    function test_WhenCallingInitializeAgain() external givenTheContractIsDeployedWithDefaultMintSettings {
+    function test_WhenCallingInitializeAgain() external givenTheContractIsBeingDeployedWithDefaultMintSettings {
         // It reverts if trying to re-initialize
         GovernanceERC20.MintSettings memory emptyMintSettings;
         vm.expectRevert("Initializable: contract is already initialized");
         token.initialize(dao, TOKEN_NAME, TOKEN_SYMBOL, emptyMintSettings);
     }
 
-    function test_WhenCheckingTheTokenNameAndSymbol() external view givenTheContractIsDeployedWithDefaultMintSettings {
+    function test_WhenCheckingTheTokenNameAndSymbol()
+        external
+        view
+        givenTheContractIsBeingDeployedWithDefaultMintSettings
+    {
         // It sets the token name and symbol
         assertEq(token.name(), TOKEN_NAME);
         assertEq(token.symbol(), TOKEN_SYMBOL);
     }
 
-    function test_WhenCheckingTheManagingDAO() external view givenTheContractIsDeployedWithDefaultMintSettings {
+    function test_WhenCheckingTheManagingDAO() external view givenTheContractIsBeingDeployedWithDefaultMintSettings {
         // It sets the managing DAO
         assertEq(address(token.dao()), address(dao));
     }
@@ -170,7 +174,7 @@ contract GovernanceERC20Test is TestBase {
     }
 
     modifier givenTheContractIsDeployedWithInitialBalances() {
-        // Same as givenTheContractIsDeployedWithDefaultMintSettings, used for logical separation
+        // Same as givenTheContractIsBeingDeployedWithDefaultMintSettings, used for logical separation
 
         address[] memory receivers = new address[](3);
         receivers[0] = alice;

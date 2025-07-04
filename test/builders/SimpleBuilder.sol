@@ -34,6 +34,7 @@ contract SimpleBuilder is TestBase {
     IPlugin.Operation targetOperation;
     uint256 minApprovals;
     bytes pluginMetadata;
+    address[] excludedAccounts;
 
     constructor() {
         // Set the caller as the initial daoOwner
@@ -117,8 +118,12 @@ contract SimpleBuilder is TestBase {
         return this;
     }
 
+    function withExcludedAccount(address account) public returns (SimpleBuilder) {
+        excludedAccounts.push(account);
+        return this;
+    }
+
     /// @dev Creates a DAO with the given orchestration settings.
-    /// @dev The setup is done on block/timestamp 0 and tests should be made on block/timestamp 1 or later.
     function build()
         public
         returns (DAO dao, TokenVoting plugin, IVotesUpgradeable token_, VotingPowerCondition condition)
@@ -168,7 +173,8 @@ contract SimpleBuilder is TestBase {
             ProxyLib.deployUUPSProxy(
                 address(TOKEN_VOTING_PLUGIN_BASE),
                 abi.encodeCall(
-                    TokenVoting.initialize, (dao, votingSettings, token_, targetConfig, minApprovals, pluginMetadata)
+                    TokenVoting.initialize,
+                    (dao, votingSettings, token_, targetConfig, minApprovals, pluginMetadata, excludedAccounts)
                 )
             )
         );

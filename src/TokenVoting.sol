@@ -2,19 +2,18 @@
 
 pragma solidity ^0.8.8;
 
-import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
-import {SafeCastUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
-import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-
+import {DAO, IDAO, Action} from "@aragon/osx/core/dao/DAO.sol";
+import {IProposal} from "@aragon/osx-commons-contracts/src/plugin/extensions/proposal/IProposal.sol";
+import {MajorityVotingBase} from "./base/MajorityVotingBase.sol";
+import {PluginUUPSUpgradeable} from "@aragon/osx/framework/plugin/setup/PluginSetupProcessor.sol";
 import {IMembership} from "@aragon/osx-commons-contracts/src/plugin/extensions/membership/IMembership.sol";
 import {_applyRatioCeiled} from "@aragon/osx-commons-contracts/src/utils/math/Ratio.sol";
 
-import {IDAO} from "@aragon/osx-commons-contracts/src/dao/IDAO.sol";
-import {IProposal} from "@aragon/osx-commons-contracts/src/plugin/extensions/proposal/IProposal.sol";
-import {Action} from "@aragon/osx-commons-contracts/src/executors/IExecutor.sol";
-
-import {MajorityVotingBase} from "./base/MajorityVotingBase.sol";
+import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
+import {SafeCastUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
+import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {IERC6372Upgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC6372Upgradeable.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title TokenVoting
 /// @author Aragon X - 2021-2025
@@ -26,16 +25,24 @@ import {IERC6372Upgradeable} from "@openzeppelin/contracts-upgradeable/interface
 /// @custom:security-contact sirt@aragon.org
 contract TokenVoting is IMembership, MajorityVotingBase {
     using SafeCastUpgradeable for uint256;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice The [ERC-165](https://eips.ethereum.org/EIPS/eip-165) interface ID of the contract.
     bytes4 internal constant TOKEN_VOTING_INTERFACE_ID = this.getVotingToken.selector;
 
     /// @notice An [OpenZeppelin `Votes`](https://docs.openzeppelin.com/contracts/4.x/api/governance#Votes)
     ///         compatible contract referencing the token being used for voting.
-    IVotesUpgradeable private votingToken;
+    IVotesUpgradeable private votingToken; // Slot 0
 
     /// @notice Wether the token contract indexes past voting power by timestamp.
-    bool private tokenIndexedByTimestamp;
+    bool private tokenIndexedByTimestamp; // Slot 0
+
+    /// @notice The list of addresses excluded from voting
+    EnumerableSet.AddressSet internal excludedAccounts; // Slot 1
+
+    /// @notice Emitted when an account's balance is considered as non-circulating supply. Its balance will be excluded from the token supply computation.
+    /// @param accounts The addresses whose balance is considered as not circulating
+    event ExcludedFromSupply(address[] accounts);
 
     /// @notice Thrown if the voting power is zero
     error NoVotingPower();
@@ -63,13 +70,25 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         IVotesUpgradeable _token,
         TargetConfig calldata _targetConfig,
         uint256 _minApprovals,
-        bytes calldata _pluginMetadata
+        bytes calldata _pluginMetadata,
+        address[] memory _excludedAccounts
     ) external onlyCallAtInitialization reinitializer(3) {
         __MajorityVotingBase_init(_dao, _votingSettings, _targetConfig, _minApprovals, _pluginMetadata);
 
         votingToken = _token;
 
         _detectTokenClock();
+
+        for (uint256 i; i < _excludedAccounts.length;) {
+            excludedAccounts.add(_excludedAccounts[i]);
+
+            unchecked {
+                ++i;
+            }
+        }
+        if (_excludedAccounts.length > 0) {
+            emit ExcludedFromSupply(_excludedAccounts);
+        }
 
         emit MembershipContractAnnounced({definingContract: address(_token)});
     }
@@ -95,6 +114,10 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         }
         if (_fromBuild < 4) {
             _detectTokenClock();
+
+            // @dev The list of excluded accounts are intentionally skipped here
+            //      Changing the excluded supply on the fly could break important governance invariants,
+            //      therefore such feature is only allowed during the first initialization.
         }
     }
 
@@ -114,9 +137,19 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         return votingToken;
     }
 
-    /// @inheritdoc MajorityVotingBase
-    function totalVotingPower(uint256 _blockNumber) public view override returns (uint256) {
-        return votingToken.getPastTotalSupply(_blockNumber);
+    /// @notice Returns the total voting power checkpointed for a specific timestamp or block number, subtracting the balance of excluded addresses.
+    /// @param _timePoint The block number or timestamp.
+    /// @return The effective voting power.
+    function totalVotingPower(uint256 _timePoint) public view override returns (uint256) {
+        uint256 _excludedSupply;
+        for (uint256 i; i < excludedAccounts.length();) {
+            _excludedSupply += votingToken.getPastVotes(excludedAccounts.at(i), _timePoint);
+
+            unchecked {
+                ++i;
+            }
+        }
+        return votingToken.getPastTotalSupply(_timePoint) - _excludedSupply;
     }
 
     /// @inheritdoc MajorityVotingBase
@@ -336,5 +369,5 @@ contract TokenVoting is IMembership, MajorityVotingBase {
     /// @dev This empty reserved space is put in place to allow future versions to add new
     /// variables without shifting down storage in the inheritance chain.
     /// https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-    uint256[49] private __gap;
+    uint256[48] private __gap;
 }
