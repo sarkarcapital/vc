@@ -1,22 +1,91 @@
-# Aragon OSx Plugin Template 🚀
+# Token Voting Plugin [![Foundry][foundry-badge]][foundry] [![License: AGPL v3][license-badge]][license]
 
-Welcome to the Foundry template for OSx plugins!
+[foundry]: https://getfoundry.sh/
+[foundry-badge]: https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg
+[license]: https://opensource.org/licenses/AGPL-v3
+[license-badge]: https://img.shields.io/badge/License-AGPL_v3-blue.svg
 
-This template is designed to help get developers up and running with OSx in a few minutes.
+## Audit
 
-## Features ✨
+<!--
+### v1.4
 
-- **Foundry**: Configured with the right dependencies and settings for Aragon OSx.
-- **Versatile contract starters**: [See Template Variants below](#template-variants-)
-- **Deployment scripts and factories**: Starter scripts for simple plugin publishing, as well as for custom DAO deployments.
-- **Flexible testing environment**: A set of tools to run unit tests, fork tests, describe use cases and prepare entire deployments in one line.
-- **Multi explorer code verification**: Verify on multiple block explorers given the same deployment
-- **Streamlined action runner**: A self documented [makefile](#using-the-makefile) to manage the entire workflow
-- **Code snippets and examples**
+**Halborn**: [audit report](https://)
 
-## Prerequisites 📋
+- Commit ID: [________](https://github.com/aragon/token-voting-plugin/commit/________)
+- Started: ________
+- Finished: ________
+-->
+
+### v1.3
+
+TokenVoting v1.4 has been ported to Foundry.
+
+The codebase of version 1.3 can be found [in this repo](_________).
+
+**Halborn**: [audit report](https://github.com/aragon/osx/tree/main/audits/Halborn_AragonOSx_v1_4_Smart_Contract_Security_Assessment_Report_2025_01_03.pdf)
+
+- Commit ID: [02a7dbb95c42ebd2226117bf85a0fe330c788948](https://github.com/aragon/token-voting-plugin/commit/02a7dbb95c42ebd2226117bf85a0fe330c788948)
+- Started: 2024-11-18
+- Finished: 2025-02-13
+
+<!--
+## ABI and artifacts
+
+Check out the [artifacts folder](./packages/artifacts/README.md) to get the deployed addresses and the contract ABI's.
+-->
+
+## Features
+
+TokenVoting is an Aragon OSx Plugin, designed to conduct governance processes where the voting power of each member is determined by an [IVotes compatible token](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/governance/utils/IVotes.sol).
+
+Three voting modes:
+- Early execution: Execute when there's mathematical certainty that the proposal can't be defeated
+- Vote replacement: Allow to change votes until the proposal ends
+- Standard mode: No vote replacement or early execution.
+
+Two token contracts are provided for convenience:
+- GovernanceERC20: Mint a new token with a predefined set of addresses to mint for
+- GovernanceWrappedERC20: Wrap an existing token that does not support [IVotes](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/governance/utils/IVotes.sol) by itself
+
+If you already have an IVotes compatible token, you can simply import it.
+
+Other features:
+- Excluding balances from certain accounts (non-circulating supply, e.g. vaults, the DAO's own holdings, etc)
+- Mint freezing
+- Granular permission management for proposal creation, proposal execution, token minting
+- Minimum balance requirements for proposers
+
+## Project structure
+
+```
+├── LICENSE
+├── Makefile
+├── foundry.toml
+├── remappings.txt
+├── script
+│   ├── DeployPluginRepo.s.sol
+│   ├── make-test-tree.ts
+│   └── verify-contracts.sh
+├── src
+│   ├── TokenVoting.sol
+│   ├── TokenVotingSetup.sol
+│   ├── TokenVotingSetupZkSync.sol
+│   ├── base
+│   │   ├── IMajorityVoting.sol
+│   │   └── MajorityVotingBase.sol
+│   ├── condition
+│   │   └── VotingPowerCondition.sol
+│   └── erc20
+│       ├── GovernanceERC20.sol
+│       ├── GovernanceWrappedERC20.sol
+│       ├── IERC20MintableUpgradeable.sol
+│       └── IGovernanceWrappedERC20.sol
+└── test
+```
+
+## Prerequisites
 - [Foundry](https://getfoundry.sh/)
-- [Git](https://git-scm.com/)
 - [Make](https://www.gnu.org/software/make/)
 
 Optional:
@@ -24,39 +93,16 @@ Optional:
 - [Docker](https://www.docker.com) (recommended for deploying)
 - [Deno](https://deno.land)  (used to scaffold the test files)
 
-## Getting Started 🏁
+## Getting Started
 
-To get started, clone this repository and initialize the repository:
+To get started, clone this repository and initialize it:
 
 ```bash
-git clone https://github.com/aragon/osx-plugin-template-foundry my-plugin
-cd my-plugin && rm -Rf .git && git init .
 cp .env.example .env
 make init
 ```
 
 Edit `.env` to match your desired network and settings.
-
-### Installing dependencies
-
-```sh
-forge install <github-org>/<repo-name>  # replace accordingly
-
-# Use the version you need
-cd lib/<repo-name>
-git checkout v1.9.0
-
-# Commit the version to use
-cd -
-git add lib/<repo-name>
-git commit -m"Using repo-name v1.9.0"
-```
-
-Add the new package to `remappings.txt`:
-
-```txt
-@organiation/repo-name/=lib/repo-name
-```
 
 ### Using the Makefile
 
@@ -97,39 +143,7 @@ Verification:
 - make refund             Refund the remaining balance left on the deployment account
 ```
 
-## Template Variants 🌈
-
-In order to accommodate a wide range of cases, this repo provides comprehensive examples for the following variants:
-
-### Plugin types
-
-- [UUPS upgradeable plugin](./src/MyUpgradeablePlugin.sol)
-- [Cloneable plugin](./src/MyCloneablePlugin.sol)
-- [Static plugin](./src/MyStaticPlugin.sol)
-
-Update the code within `constructor()` and `prepareInstallation()` on the [plugin setup](./src/setup/MyPluginSetup.sol) to make it use the variant of your choice.
-
-For upgradeable plugins, consider inheriting from `PluginUpgradeableSetup` instead of `PluginSetup`.
-
-### Deployment flows
-
-- [Deploying a plugin repository](./script/DeploySimple.s.sol) (simple, trusted)
-- [Deploying a DAO with plugin(s) installed](./script/DeployDaoWithPlugins.s.sol) (trusted)
-- [Deploying a DAO with plugin(s) via a Factory](./script/DeployViaFactory.s.sol)  (trustless)
-
-Update `DEPLOYMENT_SCRIPT` in `Makefile` to make it use the deployment script of your choice.
-
-### DAO builders (for testing)
-
-- [Simple builder](./test/builders/SimpleBuilder.sol)
-  - It creates a simple DAO with the available plugin(s) installed
-  - It uses convenient defaults while allowing to override when needed
-- [Fork Builder](./test/builders/ForkBuilder.sol)
-  - It returns a full DAO setup with the available plugin(s) installed
-  - It creates a network fork and uses the configured `DAO_FACTORY_ADDRESS` and `PLUGIN_REPO_FACTORY_ADDRESS` for simulating deployments
-  - Like before, it uses convenient defaults while allowing to override when needed
-
-## Testing 🔍
+## Testing
 
 Using `make`:
 
@@ -187,58 +201,6 @@ $ make sync-tests
 ```
 
 Each yaml file generates (or syncs) a solidity test file with functions ready to be implemented. They also generate a human readable summary in [TESTS.md](./TESTS.md).
-
-### Using LLM's to describe the expected tests
-
-```sh
-$ make
-Testing lifecycle:
-# ...
-
-- make test-llm-prompt    Generates a prompt to generate the test tree for a given file
-
-$ make test-llm-prompt file=./src/MyUpgradeablePlugin.sol
-```
-
-This command will generate a prompt that you can copy to an LLM so that it generates a yaml test tree definition for you.
-
-You can copy the resulting yaml output into a file like `test/MyUpgradeablePlugin.t.yaml` and run `make sync-tests` to get a test scaffold with the unimplemented tests.
-
-### Testing with a local OSx
-
-You can deploy an in-memory, local OSx deployment to run your E2E tests on top of it.
-
-```sh
-forge install aragon/protocol-factory
-```
-
-You may need to set `via_ir` to `true` on `foundry.toml`.
-
-Given that this repository already depends on OSx, you may want to replace the existing `remappings.txt` entry and use the OSx path provided by `protocol-factory` itself.
-
-```diff
--@aragon/osx/=lib/osx/packages/contracts/src/
-
-+@aragon/protocol-factory/=lib/protocol-factory/
-+@aragon/osx/=lib/protocol-factory/lib/osx/packages/contracts/src/
-```
-
-Then, use the protocol factory to deploy OSx and use its contracts as you need.
-
-```solidity
-// Set the path according to your remappings.txt file
-import {ProtocolFactoryBuilder} from "@aragon/protocol-factory/test/helpers/ProtocolFactoryBuilder.sol";
-
-// Prepare an OSx factory
-ProtocolFactory factory = new ProtocolFactoryBuilder().build();
-factory.deployOnce();
-
-// Get the protocol addresses
-ProtocolFactory.Deployment memory deployment = factory.getDeployment();
-console.log("DaoFactory", deployment.daoFactory);
-```
-
-You can even [customize these OSx deployments](https://github.com/aragon/protocol-factory?tab=readme-ov-file#if-you-need-to-override-some-parameters) if needed.
 
 ## Deployment 🚀
 

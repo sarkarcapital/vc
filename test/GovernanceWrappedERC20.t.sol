@@ -355,9 +355,9 @@ contract GovernanceWrappedERC20Test is TestBase {
         vm.prank(alice);
         governanceToken.depositFor(alice, 100 ether);
         vm.prank(alice);
-        governanceToken.transfer(bob, 50 ether); // Turns on delegation for Bob
+        governanceToken.transfer(bob, 50 ether);
         vm.prank(bob);
-        governanceToken.delegate(address(0)); // Bob turns it off
+        governanceToken.delegate(address(0)); // Bob turns delegation off (not needed)
         _;
     }
 
@@ -366,12 +366,12 @@ contract GovernanceWrappedERC20Test is TestBase {
         givenAFreshTokenContractIsDeployedAndBalancesAreSet
         givenTheRecipientHasManuallyTurnedDelegationOff
     {
-        // It should not turn on delegation on `transfer` if `to` manually turned it off
+        // It should turn on delegation on `transfer` if `to` is not delegating
         vm.prank(alice);
         governanceToken.transfer(bob, 50 ether);
 
-        assertEq(governanceToken.delegates(bob), address(0));
-        assertEq(governanceToken.getVotes(bob), 0);
+        assertEq(governanceToken.delegates(bob), bob);
+        assertEq(governanceToken.getVotes(bob), 100 ether);
     }
 
     function test_WhenMintingTokensForTheRecipient() external givenAFreshTokenContractIsDeployedAndBalancesAreSet {
@@ -380,12 +380,13 @@ contract GovernanceWrappedERC20Test is TestBase {
         governanceToken.depositFor(alice, 100 ether);
         vm.prank(alice);
         governanceToken.delegate(address(0)); // Alice turns it off
+        assertEq(governanceToken.delegates(alice), address(0));
 
         vm.prank(alice);
         governanceToken.depositFor(alice, 50 ether);
 
-        assertEq(governanceToken.delegates(alice), address(0));
-        assertEq(governanceToken.getVotes(alice), 0);
+        assertEq(governanceToken.delegates(alice), alice);
+        assertEq(governanceToken.getVotes(alice), 150 ether);
     }
 
     modifier givenTheUserHasSetADelegateBeforeReceivingTokens() {
@@ -596,6 +597,7 @@ contract GovernanceWrappedERC20Test is TestBase {
         governanceToken.depositFor(to, 100 ether);
         toDelegate = to;
         assertEq(governanceToken.balanceOf(to), 100 ether);
+        assertEq(governanceToken.getVotes(to), 100 ether);
         _;
     }
 
@@ -622,12 +624,22 @@ contract GovernanceWrappedERC20Test is TestBase {
         givenTheToAddressHasDelegatedToOther2
         whenToReceivesMoreTokensViaDepositFor
     {
+        assertEq(governanceToken.balanceOf(to), 200 ether);
+        assertEq(governanceToken.balanceOf(toDelegate), 0);
+
         vm.prank(to);
-        governanceToken.transfer(other, 100 ether);
+        governanceToken.transfer(other, 100 ether); // toDelegate
 
         assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
         assertEq(governanceToken.delegates(to), toDelegate, "`to`s delegate has changed");
-        assertEq(governanceToken.getVotes(toDelegate), 100 ether, "`to`s delegate has incorrect voting power");
+        assertEq(governanceToken.getVotes(toDelegate), 200 ether, "`to`s delegate has incorrect voting power");
+
+        vm.prank(to);
+        governanceToken.transfer(david, 50 ether);
+
+        assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), toDelegate, "`to`s delegate has changed");
+        assertEq(governanceToken.getVotes(toDelegate), 150 ether, "`to`s delegate has incorrect voting power");
     }
 
     function test_WhenToThenRedelegatesToOther()
@@ -667,12 +679,22 @@ contract GovernanceWrappedERC20Test is TestBase {
         givenTheToAddressHasDelegatedToOther2
         whenToReceivesMoreTokensViaTransferFromFrom
     {
+        assertEq(governanceToken.balanceOf(to), 200 ether);
+        assertEq(governanceToken.balanceOf(toDelegate), 0);
+
         vm.prank(to);
-        governanceToken.transfer(other, 100 ether);
+        governanceToken.transfer(other, 100 ether); // toDelegate
 
         assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
         assertEq(governanceToken.delegates(to), toDelegate, "`to`s delegate has changed");
-        assertEq(governanceToken.getVotes(toDelegate), 100 ether, "`to`s delegate has incorrect voting power");
+        assertEq(governanceToken.getVotes(toDelegate), 200 ether, "`to`s delegate has incorrect voting power");
+
+        vm.prank(to);
+        governanceToken.transfer(david, 50 ether);
+
+        assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
+        assertEq(governanceToken.delegates(to), toDelegate, "`to`s delegate has changed");
+        assertEq(governanceToken.getVotes(toDelegate), 150 ether, "`to`s delegate has incorrect voting power");
     }
 
     function test_WhenToThenRedelegatesToOther2()
@@ -780,5 +802,125 @@ contract GovernanceWrappedERC20Test is TestBase {
         assertEq(governanceToken.getVotes(to), 0, "`to` has incorrect voting power");
         assertEq(governanceToken.delegates(to), other, "`to`s delegate is incorrect");
         assertEq(governanceToken.getVotes(toDelegate), 200 ether, "`to`s delegate has incorrect voting power");
+    }
+
+    function test_endToEndFlow() external {
+        underlyingToken.mint(alice, 200 ether);
+        underlyingToken.mint(bob, 200 ether);
+        underlyingToken.mint(carol, 200 ether);
+        underlyingToken.mint(david, 200 ether);
+
+        vm.prank(alice);
+        underlyingToken.approve(address(governanceToken), 10 ether);
+        vm.prank(bob);
+        underlyingToken.approve(address(governanceToken), 10 ether);
+        vm.prank(carol);
+        underlyingToken.approve(address(governanceToken), 10 ether);
+        vm.prank(david);
+        underlyingToken.approve(address(governanceToken), 10 ether);
+
+        vm.prank(alice);
+        governanceToken.depositFor(alice, 10 ether);
+        vm.prank(bob);
+        governanceToken.depositFor(bob, 10 ether);
+        vm.prank(carol);
+        governanceToken.depositFor(randomAddress, 10 ether);
+        vm.prank(david);
+        governanceToken.depositFor(randomAddress, 10 ether);
+
+        vm.roll(block.number + 1);
+
+        assertEq(governanceToken.balanceOf(alice), 10 ether, "Incorrect balance");
+        assertEq(governanceToken.balanceOf(bob), 10 ether, "Incorrect balance");
+        assertEq(governanceToken.balanceOf(carol), 0, "Incorrect balance");
+        assertEq(governanceToken.balanceOf(david), 0, "Incorrect balance");
+        assertEq(governanceToken.balanceOf(randomAddress), 20 ether, "Incorrect balance");
+
+        assertEq(governanceToken.getVotes(alice), 10 ether, "Incorrect votes");
+        assertEq(governanceToken.getVotes(bob), 10 ether, "Incorrect votes");
+        assertEq(governanceToken.getVotes(carol), 0, "Incorrect votes");
+        assertEq(governanceToken.getVotes(david), 0, "Incorrect votes");
+        assertEq(governanceToken.getVotes(randomAddress), 20 ether, "Incorrect votes");
+
+        assertEq(governanceToken.getPastVotes(alice, block.number - 1), 10 ether, "Incorrect past votes");
+        assertEq(governanceToken.getPastVotes(bob, block.number - 1), 10 ether, "Incorrect past votes");
+        assertEq(governanceToken.getPastVotes(carol, block.number - 1), 0, "Incorrect past votes");
+        assertEq(governanceToken.getPastVotes(david, block.number - 1), 0, "Incorrect past votes");
+        assertEq(governanceToken.getPastVotes(randomAddress, block.number - 1), 20 ether, "Incorrect past votes");
+
+        assertEq(governanceToken.totalSupply(), 40 ether, "Incorrect supply");
+        assertEq(governanceToken.getPastTotalSupply(block.number - 1), 40 ether, "Incorrect past supply");
+
+        // Delegate
+        vm.prank(alice);
+        governanceToken.delegate(david);
+
+        vm.roll(block.number + 1);
+
+        assertEq(governanceToken.balanceOf(alice), 10 ether, "Incorrect balance");
+        assertEq(governanceToken.balanceOf(david), 0, "Incorrect balance");
+
+        assertEq(governanceToken.getVotes(alice), 0, "Incorrect votes");
+        assertEq(governanceToken.getVotes(david), 10 ether, "Incorrect votes");
+
+        assertEq(governanceToken.getPastVotes(alice, block.number - 1), 0, "Incorrect past votes");
+        assertEq(governanceToken.getPastVotes(david, block.number - 1), 10 ether, "Incorrect past votes");
+
+        // Undelegate
+        vm.prank(alice);
+        governanceToken.delegate(address(0));
+
+        vm.roll(block.number + 1);
+
+        assertEq(governanceToken.balanceOf(alice), 10 ether, "Incorrect balance");
+        assertEq(governanceToken.balanceOf(david), 0, "Incorrect balance");
+
+        assertEq(governanceToken.getVotes(alice), 0, "Incorrect votes");
+        assertEq(governanceToken.getVotes(david), 0, "Incorrect votes");
+
+        assertEq(governanceToken.getPastVotes(alice, block.number - 1), 0, "Incorrect past votes");
+        assertEq(governanceToken.getPastVotes(david, block.number - 1), 0, "Incorrect past votes");
+
+        // Transfer tokens
+        address someRecipient = makeAddr("some-wallet");
+
+        vm.prank(alice);
+        governanceToken.transfer(someRecipient, 10 ether);
+        vm.prank(bob);
+        governanceToken.transfer(someRecipient, 10 ether);
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        vm.prank(carol);
+        governanceToken.transfer(someRecipient, 10 ether);
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        vm.prank(david);
+        governanceToken.transfer(someRecipient, 10 ether);
+        vm.prank(randomAddress);
+        governanceToken.transfer(someRecipient, 20 ether);
+
+        vm.roll(block.number + 1);
+
+        assertEq(governanceToken.balanceOf(alice), 0, "Incorrect balance");
+        assertEq(governanceToken.balanceOf(bob), 0, "Incorrect balance");
+        assertEq(governanceToken.balanceOf(carol), 0, "Incorrect balance");
+        assertEq(governanceToken.balanceOf(david), 0, "Incorrect balance");
+        assertEq(governanceToken.balanceOf(randomAddress), 0, "Incorrect balance");
+        assertEq(governanceToken.balanceOf(someRecipient), 40 ether, "Incorrect balance");
+
+        assertEq(governanceToken.getVotes(alice), 0, "Incorrect votes");
+        assertEq(governanceToken.getVotes(bob), 0, "Incorrect votes");
+        assertEq(governanceToken.getVotes(carol), 0, "Incorrect votes");
+        assertEq(governanceToken.getVotes(david), 0, "Incorrect votes");
+        assertEq(governanceToken.getVotes(randomAddress), 0, "Incorrect votes");
+        assertEq(governanceToken.getVotes(someRecipient), 40 ether, "Incorrect votes");
+
+        assertEq(governanceToken.getPastVotes(alice, block.number - 1), 0, "Incorrect past votes");
+        assertEq(governanceToken.getPastVotes(bob, block.number - 1), 0, "Incorrect past votes");
+        assertEq(governanceToken.getPastVotes(carol, block.number - 1), 0, "Incorrect past votes");
+        assertEq(governanceToken.getPastVotes(david, block.number - 1), 0, "Incorrect past votes");
+        assertEq(governanceToken.getPastVotes(randomAddress, block.number - 1), 0, "Incorrect past votes");
+        assertEq(governanceToken.getPastVotes(someRecipient, block.number - 1), 40 ether, "Incorrect past votes");
+
+        assertEq(governanceToken.totalSupply(), 40 ether);
+        assertEq(governanceToken.getPastTotalSupply(block.number - 1), 40 ether);
     }
 }
