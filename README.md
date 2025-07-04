@@ -143,16 +143,6 @@ Verification:
 - make refund             Refund the remaining balance left on the deployment account
 ```
 
-### DAO builders (for testing)
-
-- [Simple builder](./test/builders/SimpleBuilder.sol)
-  - It creates a simple DAO with the available plugin(s) installed
-  - It uses convenient defaults while allowing to override when needed
-- [Fork Builder](./test/builders/ForkBuilder.sol)
-  - It returns a full DAO setup with the available plugin(s) installed
-  - It creates a network fork and uses the configured `DAO_FACTORY_ADDRESS` and `PLUGIN_REPO_FACTORY_ADDRESS` for simulating deployments
-  - Like before, it uses convenient defaults while allowing to override when needed
-
 ## Testing
 
 Using `make`:
