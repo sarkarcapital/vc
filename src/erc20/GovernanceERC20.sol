@@ -37,10 +37,10 @@ contract GovernanceERC20 is
     bytes32 public constant MINT_PERMISSION_ID = keccak256("MINT_PERMISSION");
 
     /// @notice Whether mint() has been permanently disabled.
-    bool public mintingFrozen;
+    bool private mintingFrozen;
 
     /// @notice Whether mint() should enable self delegation if the receiver has no delegate.
-    bool public ensureDelegationOnMint;
+    bool private ensureDelegationOnMint;
 
     /// @notice The settings for the initial mint of the token.
     /// @param receivers The receivers of the tokens. On initialization only.
@@ -124,7 +124,7 @@ contract GovernanceERC20 is
     /// @notice Mints tokens to an address.
     /// @param to The address receiving the tokens.
     /// @param amount The amount of tokens to be minted.
-    function mint(address to, uint256 amount) external override auth(MINT_PERMISSION_ID) {
+    function mint(address to, uint256 amount) external virtual override auth(MINT_PERMISSION_ID) {
         if (mintingFrozen) {
             revert MintingIsFrozen();
         }
@@ -136,10 +136,20 @@ contract GovernanceERC20 is
     }
 
     /// @notice Disables the mint() function permanently
-    function freezeMinting() external auth(MINT_PERMISSION_ID) {
+    function freezeMinting() public virtual auth(MINT_PERMISSION_ID) {
         if (mintingFrozen) return;
 
         mintingFrozen = true;
         emit MintingFrozen();
+    }
+
+    /// @notice Returns true if the ability to mint tokens has been frozen
+    function getMintingFrozen() external view returns (bool) {
+        return mintingFrozen;
+    }
+
+    /// @notice Whether mint() enables self delegation if the receiver has no delegate.
+    function getEnsureDelegationOnMint() external view returns (bool) {
+        return ensureDelegationOnMint;
     }
 }

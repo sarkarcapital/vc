@@ -1122,6 +1122,8 @@ contract GovernanceERC20Test is TestBase {
         emit MintingFrozen();
         token.freezeMinting();
 
+        assertTrue(token.getMintingFrozen());
+
         // KO
         initialBalance = token.balanceOf(alice);
         initialSupply = token.totalSupply();
@@ -1130,6 +1132,7 @@ contract GovernanceERC20Test is TestBase {
         token.mint(alice, 10 ether);
         assertEq(token.balanceOf(alice), initialBalance);
         assertEq(token.totalSupply(), initialSupply);
+        assertTrue(token.getMintingFrozen());
     }
 
     function test_RevertGiven_CallingFreezeMintingWithoutThePermission() external givenMintingIsAllowed {
@@ -1141,6 +1144,8 @@ contract GovernanceERC20Test is TestBase {
         );
         vm.prank(bob);
         token.freezeMinting();
+
+        assertFalse(token.getMintingFrozen());
     }
 
     modifier givenMintingIsFrozen() {
@@ -1169,11 +1174,17 @@ contract GovernanceERC20Test is TestBase {
 
     function test_GivenCallingFreezeMintingWithThePermission2() external givenMintingIsFrozen {
         // It Should do nothing
+        assertTrue(token.getMintingFrozen());
+
         token.freezeMinting();
+
+        assertTrue(token.getMintingFrozen());
     }
 
     function test_RevertGiven_CallingFreezeMintingWithoutThePermission2() external givenMintingIsFrozen {
         // It Should revert
+        assertTrue(token.getMintingFrozen());
+
         vm.expectRevert(
             abi.encodeWithSelector(
                 DaoUnauthorized.selector, address(dao), address(token), bob, token.MINT_PERMISSION_ID()
@@ -1181,6 +1192,8 @@ contract GovernanceERC20Test is TestBase {
         );
         vm.prank(bob);
         token.freezeMinting();
+
+        assertTrue(token.getMintingFrozen());
     }
 
     function test_endToEndMintingWithSelfDelegation() external givenMintingIsAllowed {
@@ -1196,6 +1209,8 @@ contract GovernanceERC20Test is TestBase {
             })
         );
         dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
+
+        assertTrue(token.getEnsureDelegationOnMint());
 
         token.mint(alice, 10 ether);
         token.mint(bob, 10 ether);
@@ -1271,6 +1286,8 @@ contract GovernanceERC20Test is TestBase {
             })
         );
         dao.grant(address(token), address(this), token.MINT_PERMISSION_ID());
+
+        assertFalse(token.getEnsureDelegationOnMint());
 
         token.mint(alice, 10 ether);
         token.mint(bob, 10 ether);
