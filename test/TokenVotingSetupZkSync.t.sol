@@ -59,7 +59,11 @@ contract TokenVotingSetupZkSyncTest is TestBase {
             minProposerVotingPower: 0
         });
         defaultTokenSettings = PluginSetupContract.TokenSettings({addr: address(0), name: "MyToken", symbol: "TKN"});
-        defaultMintSettings = GovernanceERC20.MintSettings({receivers: new address[](0), amounts: new uint256[](0)});
+        defaultMintSettings = GovernanceERC20.MintSettings({
+            receivers: new address[](0),
+            amounts: new uint256[](0),
+            ensureDelegationOnMint: true
+        });
         defaultTargetConfig = IPlugin.TargetConfig({target: address(dao), operation: IPlugin.Operation.Call});
         defaultMinApproval = 300_000;
         defaultMetadata = "0x11";
@@ -419,7 +423,8 @@ contract TokenVotingSetupZkSyncTest is TestBase {
         amounts[2] = 1 ether;
         amounts[3] = 1 ether;
 
-        defaultMintSettings = GovernanceERC20.MintSettings({receivers: allAccounts, amounts: amounts});
+        defaultMintSettings =
+            GovernanceERC20.MintSettings({receivers: allAccounts, amounts: amounts, ensureDelegationOnMint: true});
         defaultExcludedAccounts = new address[](2);
         defaultExcludedAccounts[0] = alice;
         defaultExcludedAccounts[1] = bob;
@@ -473,7 +478,8 @@ contract TokenVotingSetupZkSyncTest is TestBase {
         amounts[2] = 1 ether;
         amounts[3] = 1 ether;
 
-        defaultMintSettings = GovernanceERC20.MintSettings({receivers: allAccounts, amounts: amounts});
+        defaultMintSettings =
+            GovernanceERC20.MintSettings({receivers: allAccounts, amounts: amounts, ensureDelegationOnMint: true});
         defaultExcludedAccounts = new address[](0);
 
         defaultTokenSettings.addr = address(0);
@@ -556,6 +562,65 @@ contract TokenVotingSetupZkSyncTest is TestBase {
         assertEq(plugin.totalVotingPower(block.number - 1), 2 ether);
     }
 
+    function test_WhenThereAreExcludedAccountsButNoSelfDelegation()
+        external
+        givenTheContextIsPrepareInstallation
+        givenCreatingANewToken
+    {
+        // It Should prepare initialization data for both the token and plugin with excluded accounts but no balance excluded
+
+        address[] memory allAccounts = new address[](4);
+        allAccounts[0] = alice;
+        allAccounts[1] = bob;
+        allAccounts[2] = carol;
+        allAccounts[3] = david;
+        uint256[] memory amounts = new uint256[](4);
+        amounts[0] = 1 ether;
+        amounts[1] = 1 ether;
+        amounts[2] = 1 ether;
+        amounts[3] = 1 ether;
+
+        defaultMintSettings =
+            GovernanceERC20.MintSettings({receivers: allAccounts, amounts: amounts, ensureDelegationOnMint: false});
+        defaultExcludedAccounts = new address[](2);
+        defaultExcludedAccounts[0] = alice;
+        defaultExcludedAccounts[1] = bob;
+
+        defaultTokenSettings.addr = address(0);
+        (address pluginAddr, IPluginSetup.PreparedSetupData memory prepared) = pluginSetup.prepareInstallation(
+            address(dao),
+            pluginSetup.encodeInstallationParameters(
+                defaultVotingSettings,
+                defaultTokenSettings,
+                defaultMintSettings,
+                defaultTargetConfig,
+                defaultMinApproval,
+                defaultMetadata,
+                defaultExcludedAccounts
+            )
+        );
+
+        vm.roll(block.number + 10);
+
+        GovernanceERC20 token = GovernanceERC20(prepared.helpers[1]);
+        assertEq(token.balanceOf(alice), 1 ether);
+        assertEq(token.getVotes(alice), 0);
+        assertEq(token.delegates(alice), address(0));
+        assertEq(token.balanceOf(bob), 1 ether);
+        assertEq(token.getVotes(bob), 0);
+        assertEq(token.delegates(bob), address(0));
+
+        assertEq(token.balanceOf(carol), 1 ether);
+        assertEq(token.getVotes(carol), 0);
+        assertEq(token.delegates(carol), address(0));
+        assertEq(token.balanceOf(david), 1 ether);
+        assertEq(token.getVotes(david), 0);
+        assertEq(token.delegates(david), address(0));
+
+        TokenVoting plugin = TokenVoting(pluginAddr);
+        assertEq(plugin.totalVotingPower(block.number - 1), 4 ether);
+    }
+
     modifier givenASetOfInstallationParametersIncludingAListOfExcludedAccounts() {
         _;
     }
@@ -582,7 +647,7 @@ contract TokenVotingSetupZkSyncTest is TestBase {
         );
         assertEq(
             data1,
-            hex"0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000007a1200000000000000000000000000000000000000000000000000000000000030d400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000260000000000000000000000000ddc10602782af652bb913f7bde1fd82981db7dd9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000493e000000000000000000000000000000000000000000000000000000000000002e000000000000000000000000000000000000000000000000000000000000003200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000074d79546f6b656e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003544b4e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000430783131000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000a11ce00000000000a11ce00000000000a11ce000000000000000000000000000b0b00000000b0b00000000b0b00000000b0b0"
+            hex"0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000007a1200000000000000000000000000000000000000000000000000000000000030d400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000260000000000000000000000000ddc10602782af652bb913f7bde1fd82981db7dd9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000493e0000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000003400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000074d79546f6b656e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003544b4e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000430783131000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000a11ce00000000000a11ce00000000000a11ce000000000000000000000000000b0b00000000b0b00000000b0b00000000b0b0"
         );
 
         // 2
@@ -1203,7 +1268,7 @@ contract TokenVotingSetupZkSyncTest is TestBase {
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = 100e18;
         amounts[1] = 200e18;
-        defaultMintSettings = GovernanceERC20.MintSettings(receivers, amounts);
+        defaultMintSettings = GovernanceERC20.MintSettings(receivers, amounts, true);
         _;
     }
 
@@ -1280,7 +1345,7 @@ contract TokenVotingSetupZkSyncTest is TestBase {
         receivers[0] = alice;
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 1 ether;
-        defaultMintSettings = GovernanceERC20.MintSettings(receivers, amounts);
+        defaultMintSettings = GovernanceERC20.MintSettings(receivers, amounts, true);
         _;
     }
 

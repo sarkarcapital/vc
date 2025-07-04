@@ -45,6 +45,9 @@ TokenVotingSetupTest:
           - when: The list of excluded accounts is empty
             then:
               - it: Should prepare initialization data for both the token and plugin with an empty list of excluded accounts
+          - when: There are excluded accounts but no self delegation
+            then:
+              - it: Should prepare initialization data for both the token and plugin with excluded accounts but no balance excluded
       - when: Calling prepareInstallation() to use an existing token with a list of excluded accounts
         then:
           - it: Should prepare initialization data for the TokenVoting plugin that includes the list of excluded accounts

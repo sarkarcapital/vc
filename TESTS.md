@@ -13,6 +13,13 @@ GovernanceERC20Test
 │   │   └── It sets the managing DAO
 │   └── When Deploying with mismatched receivers and amounts arrays
 │       └── It reverts if the `receivers` and `amounts` array lengths in the mint settings mismatch
+├── Given The contract is being deployed with specific mint settings // initialize with ensureDelegationOnMint
+│   ├── Given The ensureDelegationOnMint flag is set to true
+│   │   └── When Deploying with initial balances
+│   │       └── It self-delegates for all initial receivers
+│   └── Given The ensureDelegationOnMint flag is set to false
+│       └── When Deploying with initial balances 2
+│           └── It does not delegate for any initial receivers
 ├── Given The contract is deployed // ERC-165
 │   ├── When Calling supportsInterface with the empty interface
 │   │   └── It does not support the empty interface
@@ -32,6 +39,30 @@ GovernanceERC20Test
 │   │   └── It delegates voting power to another account
 │   └── When Delegating voting power multiple times
 │       └── It is checkpointed
+├── Given The contract was deployed with ensureDelegationOnMint as true // Delegation on mint
+│   ├── Given The receiver has never had a delegate
+│   │   └── When Minting tokens to the receiver
+│   │       └── It self-delegates the receiver's voting power
+│   ├── Given The receiver has already delegated to another account
+│   │   └── When Minting tokens to the receiver 2
+│   │       └── It does not change the existing delegation
+│   └── Given The receiver has manually delegated to address0
+│       └── When Minting tokens to the receiver 3
+│           └── It self-delegates the receiver, overwriting the address(0) delegation
+├── Given The contract was deployed with ensureDelegationOnMint as false // Delegation on mint
+│   ├── Given The receiver has never had a delegate 2
+│   │   └── When Minting tokens to the receiver 4
+│   │       └── It does NOT self-delegate the receiver's voting power
+│   └── Given The receiver has already delegated to another account 2
+│       └── When Minting tokens to the receiver 5
+│           └── It does not change the existing delegation
+├── Given The contract is deployed 3 // Delegation on transfer (regression)
+│   ├── Given The ensureDelegationOnMint flag is true
+│   │   └── When Transferring tokens to a new address
+│   │       └── It does NOT trigger self-delegation
+│   └── Given The ensureDelegationOnMint flag is false
+│       └── When Transferring tokens to a new address 2
+│           └── It does NOT trigger self-delegation
 ├── Given A token is deployed and the main signer can mint // afterTokenTransfer
 │   ├── When Minting tokens to an address for the first time
 │   │   └── It turns on delegation after mint
@@ -42,7 +73,7 @@ GovernanceERC20Test
 │   ├── Given The receiver has manually turned off delegation
 │   │   ├── When Transferring tokens to the receiver
 │   │   │   └── It should not turn on delegation on `transfer` if `to` manually turned it off
-│   │   └── When Minting tokens to the receiver
+│   │   └── When Minting tokens to the receiver 6
 │   │       └── It should not turn on delegation on `mint` if `to` manually turned it off
 │   ├── Given A user has predelegated before receiving tokens
 │   │   ├── When Transferring tokens to the user
@@ -356,10 +387,6 @@ TokenVotingTest
 │   │   └── It Should allow an empty list of excluded accounts
 │   └── When Calling initialize with duplicate addresses in the excluded accounts list
 │       └── It Should store each address only once in the excludedAccounts set
-├── Given The plugin has been upgraded from a version before build 4
-│   └── When Calling initializeFrom with fromBuild below 4
-│       ├── It Should not initialize or modify the excludedAccounts set // This ensures that the excluded supply cannot be changed during an upgrade, which could break governance invariants.
-│       └── It Should leave the excludedAccounts set empty
 ├── Given In the ERC165 context
 │   ├── When Calling supportsInterface0xffffffff
 │   │   └── It does not support the empty interface
@@ -602,8 +629,10 @@ TokenVotingSetupTest
 │   │   ├── When The list of excluded accounts is not empty
 │   │   │   ├── It Should prepare initialization data for the new GovernanceERC20 token that includes the excluded accounts for self-delegation
 │   │   │   └── It Should prepare initialization data for the TokenVoting plugin that includes the same list of excluded accounts
-│   │   └── When The list of excluded accounts is empty
-│   │       └── It Should prepare initialization data for both the token and plugin with an empty list of excluded accounts
+│   │   ├── When The list of excluded accounts is empty
+│   │   │   └── It Should prepare initialization data for both the token and plugin with an empty list of excluded accounts
+│   │   └── When There are excluded accounts but no self delegation
+│   │       └── It Should prepare initialization data for both the token and plugin with excluded accounts but no balance excluded
 │   ├── When Calling prepareInstallation to use an existing token with a list of excluded accounts
 │   │   ├── It Should prepare initialization data for the TokenVoting plugin that includes the list of excluded accounts
 │   │   └── It Should not attempt to modify the existing token
@@ -684,8 +713,10 @@ TokenVotingSetupZkSyncTest
 │   └── Given A set of installation parameters including a list of excluded accounts
 │       ├── When Calling encodeInstallationParameters
 │       │   └── It Should produce a byte string containing all parameters, including the excluded accounts
-│       └── When Calling decodeInstallationParameters on the encoded byte string
-│           └── It Should correctly decode all original parameters, including the full list of excluded accounts
+│       ├── When Calling decodeInstallationParameters on the encoded byte string
+│       │   └── It Should correctly decode all original parameters, including the full list of excluded accounts
+│       └── When There are excluded accounts but no self delegation
+│           └── It Should prepare initialization data for both the token and plugin with excluded accounts but no balance excluded
 ├── Given The context is prepareUpdate
 │   ├── When Calling prepareUpdate for an update from build 1
 │   │   └── It returns the permissions expected for the update from build 1
@@ -734,15 +765,26 @@ UpgradingTest
 │       ├── It initializeFrom succeeds
 │       ├── It protocol versions are updated correctly
 │       ├── It new settings are applied
-│       └── It the original `initialize` function is disabled post-upgrade
-└── Given The contract is at R1 B2
-    └── When Upgrading with initializeFrom 2
-        ├── It upgrades from R1 B2 with `initializeFrom`
+│       ├── It the original `initialize` function is disabled post-upgrade
+│       └── It Should detect the token clock
+├── Given The contract is at R1 B2
+│   └── When Upgrading with initializeFrom 2
+│       ├── It upgrades from R1 B2 with `initializeFrom`
+│       ├── It The old `initialize` function fails during the upgrade
+│       ├── It initializeFrom succeeds
+│       ├── It protocol versions are updated correctly
+│       ├── It new settings are applied
+│       ├── It the original `initialize` function is disabled post-upgrade
+│       └── It Should detect the token clock
+└── Given The contract is at R1 B3
+    └── When Upgrading with initializeFrom 3
+        ├── It upgrades from R1 B3 with `initializeFrom`
         ├── It The old `initialize` function fails during the upgrade
         ├── It initializeFrom succeeds
         ├── It protocol versions are updated correctly
-        ├── It new settings are applied
-        └── It the original `initialize` function is disabled post-upgrade
+        ├── It settings remain
+        ├── It the original `initialize` function is disabled post-upgrade
+        └── It Should detect the token clock
 ```
 ```
 PluginSetupForkTest
