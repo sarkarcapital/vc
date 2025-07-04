@@ -125,11 +125,11 @@ contract GovernanceERC20 is
     /// @param to The address receiving the tokens.
     /// @param amount The amount of tokens to be minted.
     function mint(address to, uint256 amount) public virtual override auth(MINT_PERMISSION_ID) {
-        if (mintingFrozen) {
+        if (getMintingFrozen()) {
             revert MintingIsFrozen();
         }
 
-        if (ensureDelegationOnMint && delegates(to) == address(0)) {
+        if (getEnsureDelegationOnMint() && delegates(to) == address(0)) {
             _delegate(to, to);
         }
         _mint(to, amount);
@@ -137,19 +137,19 @@ contract GovernanceERC20 is
 
     /// @notice Disables the mint() function permanently
     function freezeMinting() public virtual auth(MINT_PERMISSION_ID) {
-        if (mintingFrozen) return;
+        if (getMintingFrozen()) return;
 
         mintingFrozen = true;
         emit MintingFrozen();
     }
 
     /// @notice Returns true if the ability to mint tokens has been frozen
-    function getMintingFrozen() public view returns (bool) {
+    function getMintingFrozen() public view virtual returns (bool) {
         return mintingFrozen;
     }
 
     /// @notice Whether mint() enables self delegation if the receiver has no delegate.
-    function getEnsureDelegationOnMint() public view returns (bool) {
+    function getEnsureDelegationOnMint() public view virtual returns (bool) {
         return ensureDelegationOnMint;
     }
 }
