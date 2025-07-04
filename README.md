@@ -126,7 +126,8 @@ Testing lifecycle:
 - make sync-tests         Scaffold or sync test definitions into solidity tests
 - make check-tests        Checks if the solidity test files are out of sync
 - make test-tree          Generates a markdown file with the test definitions
-- make test-llm-prompt    Generates a prompt to generate the test tree for a given file
+- make test-tree-prompt   Prints an LLM prompt to generate the test definitions for a given file
+- make test-prompt        Prints an LLM prompt to implement the tests for a given contract
 
 Deployment targets:
 
@@ -152,11 +153,12 @@ $ make
 [...]
 Testing lifecycle:
 
-- make test             Run unit tests, locally
-- make test-coverage    Generate an HTML coverage report under ./report
+- make test               Run unit tests, locally
+- make test-fork          Run fork tests, using RPC_URL
+- make test-coverage      Generate an HTML coverage report under ./report
 ```
 
-Run `make test` or `forge test -vvv` to check the logic's accordance to the specs.
+Run `make test` or `make test-fork` to check the logic's accordance to the specs. The latter will require `RPC_URL` to be defined.
 
 ### Writing tests
 
