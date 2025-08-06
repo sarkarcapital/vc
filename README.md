@@ -21,11 +21,11 @@
 
 TokenVoting v1.4 has been ported to Foundry.
 
-The codebase of version 1.3 can be found [in this repo](_________).
+The codebase of version 1.3 can be found [in this repo](https://github.com/aragon/token-voting-plugin-halborn).
 
 **Halborn**: [audit report](https://github.com/aragon/osx/tree/main/audits/Halborn_AragonOSx_v1_4_Smart_Contract_Security_Assessment_Report_2025_01_03.pdf)
 
-- Commit ID: [02a7dbb95c42ebd2226117bf85a0fe330c788948](https://github.com/aragon/token-voting-plugin/commit/02a7dbb95c42ebd2226117bf85a0fe330c788948)
+- Commit ID: [02a7dbb95c42ebd2226117bf85a0fe330c788948](https://github.com/aragon/token-voting-plugin-halborn/commit/02a7dbb95c42ebd2226117bf85a0fe330c788948)
 - Started: 2024-11-18
 - Finished: 2025-02-13
 
