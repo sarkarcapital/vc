@@ -7,25 +7,23 @@
 
 ## Audit
 
-<!--
 ### v1.4
 
-**Halborn**: [audit report](https://)
+**Halborn**: [audit report](./audits/halborn-audit-1-4.pdf)
 
-- Commit ID: [________](https://github.com/aragon/token-voting-plugin/commit/________)
-- Started: ________
-- Finished: ________
--->
+- Commit ID: [aa4445a3b2b421feeed33ad000c7a0e7312f3817](https://github.com/aragon/token-voting-plugin/commit/aa4445a3b2b421feeed33ad000c7a0e7312f3817)
+- Started: July 11th, 2025
+- Finished: July 14th, 2025
 
 ### v1.3
 
 TokenVoting v1.4 has been ported to Foundry.
 
-The codebase of version 1.3 can be found [in this repo](https://github.com/aragon/token-voting-plugin-halborn).
+The HardHat codebase of version 1.3 and earlier can be found [in this repo](https://github.com/aragon/token-voting-plugin-hardhat).
 
 **Halborn**: [audit report](https://github.com/aragon/osx/tree/main/audits/Halborn_AragonOSx_v1_4_Smart_Contract_Security_Assessment_Report_2025_01_03.pdf)
 
-- Commit ID: [02a7dbb95c42ebd2226117bf85a0fe330c788948](https://github.com/aragon/token-voting-plugin-halborn/commit/02a7dbb95c42ebd2226117bf85a0fe330c788948)
+- Commit ID: [02a7dbb95c42ebd2226117bf85a0fe330c788948](https://github.com/aragon/token-voting-plugin-hardhat/commit/02a7dbb95c42ebd2226117bf85a0fe330c788948)
 - Started: 2024-11-18
 - Finished: 2025-02-13
 
@@ -221,8 +219,14 @@ When running a production deployment ceremony, you can use these steps as a refe
 - [ ] I am using the latest official docker engine, running a Debian Linux (stable) image
   - [ ] I have run `docker run --rm -it -v .:/deployment debian:bookworm-slim`
   - [ ] I have run `apt update && apt install -y make curl git vim neovim bc`
-  - [ ] I have run `curl -L https://foundry.paradigm.xyz | bash`
-  - [ ] I have run `source /root/.bashrc && foundryup`
+  - On **standard EVM networks**:
+    - [ ] I have run `curl -L https://foundry.paradigm.xyz | bash`
+    - [ ] I have run `source /root/.bashrc`
+    - [ ] I have run `foundryup`
+  - On **ZkSync networks**:
+    - [ ] I have run `curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash`
+    - [ ] I have run `source /root/.bashrc`
+    - [ ] I have run `foundryup-zksync`
   - [ ] I have run `cd /deployment`
   - [ ] I have run `cp .env.example .env`
   - [ ] I have run `make init`

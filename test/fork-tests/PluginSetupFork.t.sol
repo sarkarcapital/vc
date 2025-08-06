@@ -13,9 +13,6 @@ import {TokenVoting} from "../../src/TokenVoting.sol";
 import {IMajorityVoting} from "../../src/base/IMajorityVoting.sol";
 import {NON_EMPTY_BYTES} from "../constants.sol";
 
-import {ForkTestBase} from "../lib/ForkTestBase.sol";
-import {ForkBuilder} from "../builders/ForkBuilder.sol";
-
 // Aragon OSx Contracts
 import {DAO} from "@aragon/osx/core/dao/DAO.sol";
 import {PermissionManager} from "@aragon/osx/core/permission/PermissionManager.sol";
