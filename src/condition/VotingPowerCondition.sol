@@ -43,10 +43,14 @@ contract VotingPowerCondition is PermissionCondition {
         uint256 minProposerVotingPower_ = TOKEN_VOTING.minProposerVotingPower();
 
         if (minProposerVotingPower_ != 0) {
-            if (
-                VOTING_TOKEN.getVotes(_who) < minProposerVotingPower_
-                    && IERC20Upgradeable(address(VOTING_TOKEN)).balanceOf(_who) < minProposerVotingPower_
-            ) {
+            uint256 _timepoint;
+            if (TOKEN_VOTING.tokenIndexedByTimestamp()) {
+                _timepoint = block.timestamp - 1;
+            } else {
+                _timepoint = block.number - 1;
+            }
+
+            if (VOTING_TOKEN.getPastVotes(_who, _timepoint) < minProposerVotingPower_) {
                 return false;
             }
         }
