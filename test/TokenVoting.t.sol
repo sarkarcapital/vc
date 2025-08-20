@@ -608,14 +608,14 @@ contract TokenVotingTest is TestBase {
         _;
     }
 
-    function test_WhenTheCreatorHasNoVotingPower()
+    function test_WhenTheCreatorHadNoVotingPower()
         external
         givenInTheProposalCreationContext
         givenMinProposerVotingPower0
     {
-        // It creates a proposal if `_msgSender` owns no tokens and has no tokens delegated to her/him in the current block
+        // It creates a proposal if `_msgSender` had no voting power in the last block
         assertEq(GovernanceERC20(address(token)).balanceOf(carol), 0);
-        assertEq(token.getVotes(carol), 0);
+        assertEq(token.getPastVotes(carol, block.number - 1), 0);
 
         uint256 proposalId = _createDummyProposal(carol);
         assertTrue(proposalId > 0, "Proposal should be created");
@@ -636,69 +636,54 @@ contract TokenVotingTest is TestBase {
         _;
     }
 
-    function test_WhenTheCreatorHasNoVotingPower2()
+    function test_WhenTheCreatorHadInsufficientVotingPower()
         external
         givenInTheProposalCreationContext
         givenMinProposerVotingPowerGreaterThan0
     {
-        // It reverts if `_msgSender` owns no tokens and has no tokens delegated to her/him in the current block
-        vm.prank(carol);
+        // It reverts if `_msgSender` had insufficient voting power in the last block
         vm.expectRevert(
             abi.encodeWithSelector(
                 DaoUnauthorized.selector, address(dao), address(plugin), carol, plugin.CREATE_PROPOSAL_PERMISSION_ID()
             )
         );
         _createDummyProposal(carol);
+
+        // 2
+        vm.prank(alice);
+        GovernanceERC20(address(token)).transfer(carol, 4.9 ether); // Not enough
+
+        vm.roll(block.number + 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DaoUnauthorized.selector, address(dao), address(plugin), carol, plugin.CREATE_PROPOSAL_PERMISSION_ID()
+            )
+        );
+        _createDummyProposal(carol);
+
+        // 3 OK
+        _createDummyProposal(alice);
     }
 
-    function test_WhenTheCreatorTransfersTheirVotingPowerAwayInTheSameBlock()
+    function test_WhenTheCreatorHadSufficientVotingPower()
         external
         givenInTheProposalCreationContext
         givenMinProposerVotingPowerGreaterThan0
     {
-        // It reverts if `_msgSender` owns no tokens and has no tokens delegated to her/him in the current block although having them in the last block
+        // It creates a proposal if `_msgSender` had sufficient voting power in the last block
+        uint256 proposalId = _createDummyProposal(alice);
+        (bool open,,,,,,) = plugin.getProposal(proposalId);
+        assertTrue(open);
 
-        // Alice has enough tokens in the previous block
+        // Even if they are transferred away
         vm.prank(alice);
         GovernanceERC20(address(token)).transfer(david, 10 ether);
 
         assertEq(GovernanceERC20(address(token)).balanceOf(alice), 0);
         assertEq(token.getVotes(alice), 0);
-
-        // But not in the current block where the proposal is created
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DaoUnauthorized.selector, address(dao), address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID()
-            )
-        );
         vm.prank(alice);
-        plugin.createProposal("0x", new Action[](0), 0, 0, 0, IMajorityVoting.VoteOption.None, false);
-    }
-
-    function test_WhenTheCreatorOwnsEnoughTokens()
-        external
-        givenInTheProposalCreationContext
-        givenMinProposerVotingPowerGreaterThan0
-    {
-        // It creates a proposal if `_msgSender` owns enough tokens in the current block
-        uint256 proposalId = _createDummyProposal(alice);
-        (bool open,,,,,,) = plugin.getProposal(proposalId);
-        assertTrue(open);
-    }
-
-    function test_WhenTheCreatorOwnsEnoughTokensAndHasDelegatedThem()
-        external
-        givenInTheProposalCreationContext
-        givenMinProposerVotingPowerGreaterThan0
-    {
-        // It creates a proposal if `_msgSender` owns enough tokens and has delegated them to someone else in the current block
-        vm.prank(alice);
-        token.delegate(david);
-
-        uint256 proposalId = _createDummyProposal(alice);
-        (bool open,,,,,,) = plugin.getProposal(proposalId);
-        assertTrue(open);
+        plugin.createProposal("0x11", new Action[](0), 0, 0, 0, IMajorityVoting.VoteOption.None, false);
     }
 
     function test_WhenTheCreatorHasEnoughDelegatedTokens()
@@ -706,29 +691,15 @@ contract TokenVotingTest is TestBase {
         givenInTheProposalCreationContext
         givenMinProposerVotingPowerGreaterThan0
     {
-        // It creates a proposal if `_msgSender` owns no tokens but has enough tokens delegated to her/him in the current block
+        // It creates a proposal if `_msgSender` owns no tokens but has enough tokens delegated to her/him in the last block
         vm.prank(alice);
         token.delegate(carol);
+
+        vm.roll(block.number + 1);
 
         uint256 proposalId = _createDummyProposal(carol);
         (bool open,,,,,,) = plugin.getProposal(proposalId);
         assertTrue(open);
-    }
-
-    function test_WhenTheCreatorDoesNotHaveEnoughTokensOwnedOrDelegated() external givenInTheProposalCreationContext {
-        address[] memory holders = new address[](1);
-        holders[0] = carol;
-
-        (dao, plugin,,) =
-            new SimpleBuilder().withMinProposerVotingPower(10 ether).withNewToken(holders, 5 ether).build();
-
-        // It reverts if `_msgSender` does not own enough tokens herself/himself and has not tokens delegated to her/him in the current block
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DaoUnauthorized.selector, address(dao), address(plugin), carol, plugin.CREATE_PROPOSAL_PERMISSION_ID()
-            )
-        );
-        _createDummyProposal(carol);
     }
 
     function test_WhenTheTotalTokenSupplyIs0() external givenInTheProposalCreationContext {

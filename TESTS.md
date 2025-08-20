@@ -384,6 +384,7 @@ TokenVotingTest
 │   │       └── It Should assume a block number indexing
 │   ├── When Calling initialize with a list of excluded accounts
 │   │   ├── It Should correctly add all provided addresses to the excludedAccounts set
+│   │   ├── It Should emit an event
 │   │   └── It Should allow an empty list of excluded accounts
 │   └── When Calling initialize with duplicate addresses in the excluded accounts list
 │       └── It Should store each address only once in the excludedAccounts set
@@ -439,21 +440,15 @@ TokenVotingTest
 │       └── It Should produce the same result as if the account was not excluded
 ├── Given In the Proposal creation context
 │   ├── Given minProposerVotingPower  0
-│   │   └── When The creator has no voting power
-│   │       └── It creates a proposal if `_msgSender` owns no tokens and has no tokens delegated to her/him in the current block
+│   │   └── When The creator had no voting power
+│   │       └── It creates a proposal if `_msgSender` had no voting power in the last block
 │   ├── Given minProposerVotingPower  0 2
-│   │   ├── When The creator has no voting power 2
-│   │   │   └── It reverts if `_msgSender` owns no tokens and has no tokens delegated to her/him in the current block
-│   │   ├── When The creator transfers their voting power away in the same block // This test uses evm_setAutomine to ensure transactions are in the same block.
-│   │   │   └── It reverts if `_msgSender` owns no tokens and has no tokens delegated to her/him in the current block although having them in the last block
-│   │   ├── When The creator owns enough tokens
-│   │   │   └── It creates a proposal if `_msgSender` owns enough tokens in the current block
-│   │   ├── When The creator owns enough tokens and has delegated them
-│   │   │   └── It creates a proposal if `_msgSender` owns enough tokens and has delegated them to someone else in the current block
-│   │   ├── When The creator has enough delegated tokens
-│   │   │   └── It creates a proposal if `_msgSender` owns no tokens but has enough tokens delegated to her/him in the current block
-│   │   └── When The creator does not have enough tokens owned or delegated
-│   │       └── It reverts if `_msgSender` does not own enough tokens herself/himself and has not tokens delegated to her/him in the current block
+│   │   ├── When The creator had insufficient voting power
+│   │   │   └── It reverts if `_msgSender` had insufficient voting power in the last block
+│   │   ├── When The creator had sufficient voting power
+│   │   │   └── It creates a proposal if `_msgSender` had sufficient voting power in the last block
+│   │   └── When The creator has enough delegated tokens
+│   │       └── It creates a proposal if `_msgSender` owns no tokens but has enough tokens delegated to her/him in the last block
 │   ├── When The total token supply is 0
 │   │   └── It reverts if the total token supply is 0
 │   ├── When The start date is smaller than the current date

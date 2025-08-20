@@ -112,30 +112,20 @@ TokenVotingTest:
     and:
       - given: minProposerVotingPower == 0
         and:
-          - when: The creator has no voting power
+          - when: The creator had no voting power
             then:
-              - it: creates a proposal if `_msgSender` owns no tokens and has no tokens delegated to her/him in the current block
+              - it: creates a proposal if `_msgSender` had no voting power in the last block
       - given: minProposerVotingPower > 0
         and:
-          - when: The creator has no voting power
+          - when: The creator had insufficient voting power
             then:
-              - it: reverts if `_msgSender` owns no tokens and has no tokens delegated to her/him in the current block
-          - when: The creator transfers their voting power away in the same block
-            comment: This test uses evm_setAutomine to ensure transactions are in the same block.
+              - it: reverts if `_msgSender` had insufficient voting power in the last block
+          - when: The creator had sufficient voting power
             then:
-              - it: reverts if `_msgSender` owns no tokens and has no tokens delegated to her/him in the current block although having them in the last block
-          - when: The creator owns enough tokens
-            then:
-              - it: creates a proposal if `_msgSender` owns enough tokens in the current block
-          - when: The creator owns enough tokens and has delegated them
-            then:
-              - it: creates a proposal if `_msgSender` owns enough tokens and has delegated them to someone else in the current block
+              - it: creates a proposal if `_msgSender` had sufficient voting power in the last block
           - when: The creator has enough delegated tokens
             then:
-              - it: creates a proposal if `_msgSender` owns no tokens but has enough tokens delegated to her/him in the current block
-          - when: The creator does not have enough tokens (owned or delegated)
-            then:
-              - it: reverts if `_msgSender` does not own enough tokens herself/himself and has not tokens delegated to her/him in the current block
+              - it: creates a proposal if `_msgSender` owns no tokens but has enough tokens delegated to her/him in the last block
       - when: The total token supply is 0
         then:
           - it: reverts if the total token supply is 0
