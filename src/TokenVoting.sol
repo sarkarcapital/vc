@@ -35,7 +35,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
     IVotesUpgradeable private votingToken; // Slot 0
 
     /// @notice Wether the token contract indexes past voting power by timestamp.
-    bool private tokenIndexedByTimestamp; // Slot 0
+    bool public tokenIndexedByTimestamp; // Slot 0
 
     /// @notice The list of addresses excluded from voting
     EnumerableSet.AddressSet internal excludedAccounts; // Slot 1
