@@ -109,11 +109,15 @@ contract DeployNewPluginVersionScript is Script {
         console2.log("Action signature:");
         console2.log("- createVersion(uint8 release, address pluginSetup, bytes buildMetadata, bytes releaseMetadata)");
         console2.log("");
-        console2.log("Command:");
+        console2.log("Proposal commands:");
+        console2.log("");
+        console2.log("$ export FROM_ADDRESS=<your-address>");
+        console2.log("");
+        console2.log("$ export WALLET_TYPE=\"--trezor\"   (Set the appropriate value)");
+        console2.log("$ export WALLET_TYPE=\"--ledger\"");
+        console2.log("");
         console2.log(
-            "$ cast send [--trezor] [--ledger] --from <your-address>",
-            vm.toString(address(mgmtDaoMultisig)),
-            vm.toString(data)
+            "$ cast send $WALLET_TYPE --from $FROM_ADDRESS", vm.toString(address(mgmtDaoMultisig)), vm.toString(data)
         );
         console2.log("");
     }
