@@ -5,6 +5,7 @@ import {Script, console2} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {IDAO} from "@aragon/osx/core/dao/DAO.sol";
+import {Action} from "@aragon/osx-commons-contracts/src/executors/Executor.sol";
 import {TokenVotingSetup} from "../src/TokenVotingSetup.sol";
 import {GovernanceERC20} from "../src/erc20/GovernanceERC20.sol";
 import {GovernanceWrappedERC20} from "../src/erc20/GovernanceWrappedERC20.sol";
@@ -99,17 +100,30 @@ contract DeployTokenVoting_1_4Script is Script {
         // https://github.com/aragon/token-voting-plugin/blob/main/artifacts/
         // https://github.com/aragon/token-voting-plugin-hardhat/blob/main/packages/artifacts/src/addresses.json
 
-        bytes memory data =
+        bytes memory actionData =
             abi.encodeCall(IPluginRepo.createVersion, (1, address(pluginSetup), buildMetadataUri, releaseMetadataUri));
 
-        console2.log("Version proposal:");
-        console2.log("- Proposal created on:       ", address(mgmtDaoMultisig), " (Multisig)");
-        console2.log("- Action to:                 ", address(pluginRepo), " (TokenVoting repo)");
+        Action[] memory actions = new Action[](1);
+        actions[0].to = address(pluginRepo);
+        actions[0].data = actionData;
+        bytes memory createProposalData =
+            abi.encodeCall(IMultisigProposal.createProposal, ("ipfs://", actions, 0, true, false, 0, 0));
+
+        console2.log("Upgrade proposal:");
+        console2.log("- Plugin:                    ", address(mgmtDaoMultisig), " (Multisig)");
+        console2.log("- Action[0].to:              ", address(pluginRepo), " (TokenVoting repo)");
+        console2.log("- Action[0].data:            ", vm.toString(actionData));
         console2.log("");
         console2.log("Action signature:");
         console2.log("- createVersion(uint8 release, address pluginSetup, bytes buildMetadata, bytes releaseMetadata)");
         console2.log("");
-        console2.log("Proposal commands:");
+        console2.log("");
+        console2.log("Proposal creation (with foundry)");
+        console2.log("");
+        console2.log("Function signature:");
+        console2.log(
+            "- createProposal(bytes calldata _metadata, Action[] calldata _actions, uint256 _allowFailureMap, bool _approveProposal, bool _tryExecution, uint64 _startDate, uint64 _endDate)"
+        );
         console2.log("");
         console2.log("$ export FROM_ADDRESS=<your-address>");
         console2.log("");
@@ -117,8 +131,12 @@ contract DeployTokenVoting_1_4Script is Script {
         console2.log("$ export WALLET_TYPE=\"--ledger\"");
         console2.log("");
         console2.log(
-            "$ cast send $WALLET_TYPE --from $FROM_ADDRESS", vm.toString(address(mgmtDaoMultisig)), vm.toString(data)
+            "$ cast send $WALLET_TYPE --from $FROM_ADDRESS",
+            vm.toString(address(mgmtDaoMultisig)),
+            vm.toString(createProposalData)
         );
+        console2.log("");
+        console2.log("The transaction can be verified via `cast 4byte-decode <data>`");
         console2.log("");
     }
 
@@ -137,4 +155,16 @@ contract DeployTokenVoting_1_4Script is Script {
 
         console2.log("Deployment artifacts written to", filePath);
     }
+}
+
+interface IMultisigProposal {
+    function createProposal(
+        bytes calldata _metadata,
+        Action[] calldata _actions,
+        uint256 _allowFailureMap,
+        bool _approveProposal,
+        bool _tryExecution,
+        uint64 _startDate,
+        uint64 _endDate
+    ) external returns (uint256 proposalId);
 }
