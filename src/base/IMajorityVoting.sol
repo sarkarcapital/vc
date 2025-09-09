@@ -3,7 +3,7 @@
 pragma solidity ^0.8.8;
 
 /// @title IMajorityVoting
-/// @author Aragon X - 2022-2024
+/// @author Aragon X - 2022-2025
 /// @notice The interface of majority voting plugin.
 /// @custom:security-contact sirt@aragon.org
 interface IMajorityVoting {
