@@ -411,8 +411,12 @@ contract PluginSetupForkTest is ForkTestBase {
             new GovernanceWrappedERC20(IERC20Upgradeable(address(0)), "", "");
         TokenVotingSetup pluginSetup = new TokenVotingSetup(governanceERC20, governanceWrappedERC20);
 
+        uint256 b = pluginRepo.buildCount(1);
+
         // DAO
         vm.prank(MANAGEMENT_DAO_ADDRESS);
         pluginRepo.createVersion(1, address(pluginSetup), buildMetadataUri, releaseMetadataUri);
+
+        assertEq(pluginRepo.buildCount(1), b + 1);
     }
 }
