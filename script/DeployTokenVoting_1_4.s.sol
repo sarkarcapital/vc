@@ -18,7 +18,7 @@ import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20
  * - Deploys the plugin setup
  * - Encodes the calldata of the proposal to publish it as a new version
  */
-contract DeployNewPluginVersionScript is Script {
+contract DeployTokenVoting_1_4Script is Script {
     using stdJson for string;
 
     address deployer;

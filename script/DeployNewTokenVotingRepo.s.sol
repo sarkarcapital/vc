@@ -21,7 +21,7 @@ import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20
  * The full plugin deployment should be made from the Protocol Factory.
  * This script is provided for separate ad-hoc deployments.
  */
-contract DeployNewPluginRepoScript is Script {
+contract DeployNewTokenVotingRepoScript is Script {
     using stdJson for string;
 
     address deployer;
