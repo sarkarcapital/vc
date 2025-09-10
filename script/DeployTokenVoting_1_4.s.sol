@@ -24,9 +24,6 @@ contract DeployTokenVoting_1_4Script is Script {
 
     address deployer;
     PluginRepo pluginRepo;
-    address mgmtDaoMultisig;
-    bytes releaseMetadataUri;
-    bytes buildMetadataUri;
 
     // Artifacts
     TokenVotingSetup pluginSetup;
@@ -54,11 +51,6 @@ contract DeployTokenVoting_1_4Script is Script {
 
         pluginRepo = PluginRepo(vm.envAddress("TOKEN_VOTING_PLUGIN_REPO_ADDRESS"));
         vm.label(address(pluginRepo), "PluginRepo");
-        mgmtDaoMultisig = vm.envAddress("MANAGEMENT_DAO_MULTISIG_ADDRESS");
-        vm.label(address(mgmtDaoMultisig), "MgmtMultisig");
-
-        releaseMetadataUri = vm.envOr("RELEASE_METADATA_URI", bytes(" "));
-        buildMetadataUri = vm.envOr("BUILD_METADATA_URI", bytes(" "));
     }
 
     function run() public broadcast {
@@ -66,8 +58,6 @@ contract DeployTokenVoting_1_4Script is Script {
 
         // Done
         printDeployment();
-
-        printVersionPublishProposal();
 
         // Write the addresses to a JSON file
         if (!vm.envOr("SIMULATION", false)) {
@@ -94,53 +84,6 @@ contract DeployTokenVoting_1_4Script is Script {
         console2.log("");
     }
 
-    function printVersionPublishProposal() public view {
-        // Pick the .env contract addresses from:
-        // https://github.com/aragon/osx/blob/main/packages/artifacts/src/addresses.json
-        // https://github.com/aragon/token-voting-plugin/blob/main/artifacts/
-        // https://github.com/aragon/token-voting-plugin-hardhat/blob/main/packages/artifacts/src/addresses.json
-
-        bytes memory actionData =
-            abi.encodeCall(IPluginRepo.createVersion, (1, address(pluginSetup), buildMetadataUri, releaseMetadataUri));
-
-        Action[] memory actions = new Action[](1);
-        actions[0].to = address(pluginRepo);
-        actions[0].data = actionData;
-        uint64 expirationDate = uint64(block.timestamp) + 3 weeks;
-        bytes memory createProposalData =
-            abi.encodeCall(IMultisigProposal.createProposal, ("ipfs://", actions, 0, true, false, 0, expirationDate));
-
-        console2.log("Upgrade proposal:");
-        console2.log("- Plugin:                    ", address(mgmtDaoMultisig), " (Multisig)");
-        console2.log("- Action[0].to:              ", address(pluginRepo), " (TokenVoting repo)");
-        console2.log("- Action[0].data:            ", vm.toString(actionData));
-        console2.log("");
-        console2.log("Action signature:");
-        console2.log("- createVersion(uint8 release, address pluginSetup, bytes buildMetadata, bytes releaseMetadata)");
-        console2.log("");
-        console2.log("");
-        console2.log("Proposal creation (with foundry)");
-        console2.log("");
-        console2.log("Function signature:");
-        console2.log(
-            "- createProposal(bytes calldata _metadata, Action[] calldata _actions, uint256 _allowFailureMap, bool _approveProposal, bool _tryExecution, uint64 _startDate, uint64 _endDate)"
-        );
-        console2.log("");
-        console2.log("$ export FROM_ADDRESS=<your-address>");
-        console2.log("");
-        console2.log("$ export WALLET_TYPE=\"--trezor\"   (Set the appropriate value)");
-        console2.log("$ export WALLET_TYPE=\"--ledger\"");
-        console2.log("");
-        console2.log(
-            "$ cast send $WALLET_TYPE --from $FROM_ADDRESS",
-            vm.toString(address(mgmtDaoMultisig)),
-            vm.toString(createProposalData)
-        );
-        console2.log("");
-        console2.log("The transaction can be verified via `cast 4byte-decode <data>`");
-        console2.log("");
-    }
-
     function writeJsonArtifacts() internal {
         string memory artifacts = "output";
         artifacts.serialize("pluginRepo", address(pluginRepo));
@@ -156,16 +99,4 @@ contract DeployTokenVoting_1_4Script is Script {
 
         console2.log("Deployment artifacts written to", filePath);
     }
-}
-
-interface IMultisigProposal {
-    function createProposal(
-        bytes calldata _metadata,
-        Action[] calldata _actions,
-        uint256 _allowFailureMap,
-        bool _approveProposal,
-        bool _tryExecution,
-        uint64 _startDate,
-        uint64 _endDate
-    ) external returns (uint256 proposalId);
 }
