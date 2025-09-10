@@ -80,7 +80,7 @@ ifeq ($(CHAIN_ID),300)
 else ifeq ($(CHAIN_ID),324)
     FORGE_BUILD_CUSTOM_PARAMS := --zksync
 else ifeq ($(CHAIN_ID),88888)
-    FORGE_SCRIPT_CUSTOM_PARAMS := --priority-gas-price 1000000000
+    FORGE_SCRIPT_CUSTOM_PARAMS := --priority-gas-price 1000000000 --gas-price 5200000000000
 endif
 
 # TARGETS
