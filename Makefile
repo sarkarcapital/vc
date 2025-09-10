@@ -74,6 +74,15 @@ ifeq ($(slow),true)
 	SLOW_FLAG := --slow
 endif
 
+# Additional chain-dependent params (Foundry)
+ifeq ($(CHAIN_ID),300)
+    FORGE_BUILD_CUSTOM_PARAMS := --zksync
+else ifeq ($(CHAIN_ID),324)
+    FORGE_BUILD_CUSTOM_PARAMS := --zksync
+else ifeq ($(CHAIN_ID),88888)
+    FORGE_SCRIPT_CUSTOM_PARAMS := --priority-gas-price 1000000000
+endif
+
 # TARGETS
 
 .PHONY: help
@@ -95,7 +104,7 @@ help: ## Display the available targets
 init: ## Check the dependencies and prompt to install if needed
 	@which forge > /dev/null || curl -L https://foundry.paradigm.xyz | bash
 	@which lcov > /dev/null || echo "Note: lcov can be installed by running 'sudo apt install lcov'"
-	@forge build
+	@forge build $(FORGE_BUILD_CUSTOM_PARAMS)
 
 .PHONY: clean
 clean: ## Clean the build artifacts
@@ -110,11 +119,11 @@ test: export ETHERSCAN_API_KEY=
 
 .PHONY: test
 test: ## Run unit tests, locally
-	forge test $(VERBOSITY) --no-match-path ./test/fork-tests/*.sol
+	forge test $(FORGE_BUILD_CUSTOM_PARAMS) $(VERBOSITY) --no-match-path ./test/fork-tests/*.sol
 
 .PHONY: test-fork
 test-fork: ## Run fork tests, using RPC_URL
-	forge test $(VERBOSITY) --match-path ./test/fork-tests/*.sol
+	forge test $(FORGE_BUILD_CUSTOM_PARAMS) $(VERBOSITY) --match-path ./test/fork-tests/*.sol
 
 test-coverage: report/index.html ## Generate an HTML coverage report under ./report
 	@which open > /dev/null && open report/index.html || true
@@ -294,6 +303,8 @@ predeploy: ## Simulate a protocol deployment
 	@echo "Simulating the deployment"
 	forge script $(DEPLOYMENT_SCRIPT_PARAM) \
 		--rpc-url $(RPC_URL) \
+		$(FORGE_BUILD_CUSTOM_PARAMS) \
+		$(FORGE_SCRIPT_CUSTOM_PARAMS) \
 		$(VERBOSITY)
 
 .PHONY: deploy
@@ -305,9 +316,11 @@ deploy: test ## Deploy the protocol, verify the source code and write to ./artif
 		--retries 10 \
 		--delay 8 \
 		--broadcast \
-		$(SLOW_FLAG) \
 		--verify \
 		$(VERIFIER_PARAMS) \
+		$(SLOW_FLAG) \
+		$(FORGE_BUILD_CUSTOM_PARAMS) \
+		$(FORGE_SCRIPT_CUSTOM_PARAMS) \
 		$(VERBOSITY) 2>&1 | tee -a $(LOGS_FOLDER)/$(DEPLOYMENT_LOG_FILE)
 
 .PHONY: resume
@@ -319,10 +332,12 @@ resume: test ## Retry pending deployment transactions, verify the code and write
 		--retries 10 \
 		--delay 8 \
 		--broadcast \
-		$(SLOW_FLAG) \
 		--verify \
 		--resume \
 		$(VERIFIER_PARAMS) \
+		$(SLOW_FLAG) \
+		$(FORGE_BUILD_CUSTOM_PARAMS) \
+		$(FORGE_SCRIPT_CUSTOM_PARAMS) \
 		$(VERBOSITY) 2>&1 | tee -a $(LOGS_FOLDER)/$(DEPLOYMENT_LOG_FILE)
 
 ## Upgrade proposal:
@@ -337,17 +352,17 @@ upgrade-proposal: script/metadata/upgrade-proposal-metadata.json ## Encodes and 
 
 .PHONY: verify-etherscan
 verify-etherscan: broadcast/$(DEPLOYMENT_SCRIPT).s.sol/$(CHAIN_ID)/run-latest.json ## Verify the last deployment on an Etherscan (compatible) explorer
-	forge build
+	forge build $(FORGE_BUILD_CUSTOM_PARAMS)
 	bash $(VERIFY_CONTRACTS_SCRIPT) $(CHAIN_ID) $(VERIFIER) $(VERIFIER_URL) $(VERIFIER_API_KEY)
 
 .PHONY: verify-blockscout
 verify-blockscout: broadcast/$(DEPLOYMENT_SCRIPT).s.sol/$(CHAIN_ID)/run-latest.json ## Verify the last deployment on BlockScout
-	forge build
+	forge build $(FORGE_BUILD_CUSTOM_PARAMS)
 	bash $(VERIFY_CONTRACTS_SCRIPT) $(CHAIN_ID) $(VERIFIER) https://$(BLOCKSCOUT_HOST_NAME)/api $(VERIFIER_API_KEY)
 
 .PHONY: verify-sourcify
 verify-sourcify: broadcast/$(DEPLOYMENT_SCRIPT).s.sol/$(CHAIN_ID)/run-latest.json ## Verify the last deployment on Sourcify
-	forge build
+	forge build $(FORGE_BUILD_CUSTOM_PARAMS)
 	bash $(VERIFY_CONTRACTS_SCRIPT) $(CHAIN_ID) $(VERIFIER) "" ""
 
 ##
