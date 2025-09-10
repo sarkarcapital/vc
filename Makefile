@@ -260,6 +260,31 @@ test-prompt: ## Prints an LLM prompt to implement the tests for a given contract
 		{ print; } \
 		'
 
+## Metadata targets:
+
+.PHONY: pin-metadata
+
+pin-metadata: ## Uploads and pins the release/build metadata on IPFS
+	@if ! command -v deno >/dev/null 2>&1; then \
+	    echo "Note: deno can be installed by running 'curl -fsSL https://deno.land/install.sh | sh'" ; \
+	    exit 1 ; \
+	fi
+	@echo "Uploading build-metadata.json..."
+	@echo ipfs://$$(deno run --allow-read --allow-env --allow-net script/ipfs-pin.ts script/metadata/build-metadata.json)
+	@echo
+	@echo "Uploading release-metadata.json..."
+	@echo ipfs://$$(deno run --allow-read --allow-env --allow-net script/ipfs-pin.ts script/metadata/release-metadata.json)
+
+.PHONY: script/metadata/upgrade-proposal-metadata.json
+script/metadata/upgrade-proposal-metadata.json: broadcast/$(DEPLOYMENT_SCRIPT).s.sol/$(CHAIN_ID)/run-latest.json
+	@PLUGIN_SETUP=$$(cat $(<) | jq ".transactions[2].contractAddress" | xargs echo) && \
+		cat script/metadata/upgrade-proposal-metadata-template.json \
+		| sed  "s/___PLUGIN_SETUP___/$$PLUGIN_SETUP/g" \
+		| sed  "s/___PLUGIN_REPO___/$(TOKEN_VOTING_PLUGIN_REPO_ADDRESS)/g" \
+		| sed  "s/___RELEASE_METADATA___/$(subst /,\/,$(subst ',,$(subst ",,$(RELEASE_METADATA_URI))))/g" \
+		| sed  "s/___BUILD_METADATA___/$(subst /,\/,$(subst ',,$(subst ",,$(BUILD_METADATA_URI))))/g" \
+		> $(@)
+
 ## Deployment targets:
 
 predeploy: export SIMULATION=true
@@ -299,6 +324,14 @@ resume: test ## Retry pending deployment transactions, verify the code and write
 		--resume \
 		$(VERIFIER_PARAMS) \
 		$(VERBOSITY) 2>&1 | tee -a $(LOGS_FOLDER)/$(DEPLOYMENT_LOG_FILE)
+
+## Upgrade proposal:
+
+.PHONY: upgrade-proposal
+upgrade-proposal: script/metadata/upgrade-proposal-metadata.json ## Encodes and shows the calldata to create the upgrade proposal
+	PLUGIN_SETUP=$$(cat broadcast/$(DEPLOYMENT_SCRIPT).s.sol/$(CHAIN_ID)/run-latest.json | jq ".transactions[2].contractAddress" | xargs echo) \
+		PROPOSAL_METADATA_URI=ipfs://$$(deno run --allow-read --allow-env --allow-net script/ipfs-pin.ts $(<)) \
+        forge script script/EncodeUpgradeProposal.sol
 
 ## Verification:
 

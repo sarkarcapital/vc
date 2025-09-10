@@ -5,6 +5,7 @@ import {Script, console2} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {IDAO} from "@aragon/osx/core/dao/DAO.sol";
+import {Action} from "@aragon/osx-commons-contracts/src/executors/Executor.sol";
 import {TokenVotingSetup} from "../src/TokenVotingSetup.sol";
 import {GovernanceERC20} from "../src/erc20/GovernanceERC20.sol";
 import {GovernanceWrappedERC20} from "../src/erc20/GovernanceWrappedERC20.sol";
@@ -23,9 +24,6 @@ contract DeployTokenVoting_1_4Script is Script {
 
     address deployer;
     PluginRepo pluginRepo;
-    address mgmtDaoMultisig;
-    bytes releaseMetadataUri;
-    bytes buildMetadataUri;
 
     // Artifacts
     TokenVotingSetup pluginSetup;
@@ -53,11 +51,6 @@ contract DeployTokenVoting_1_4Script is Script {
 
         pluginRepo = PluginRepo(vm.envAddress("TOKEN_VOTING_PLUGIN_REPO_ADDRESS"));
         vm.label(address(pluginRepo), "PluginRepo");
-        mgmtDaoMultisig = vm.envAddress("MANAGEMENT_DAO_MULTISIG_ADDRESS");
-        vm.label(address(mgmtDaoMultisig), "MgmtMultisig");
-
-        releaseMetadataUri = vm.envOr("RELEASE_METADATA_URI", bytes(" "));
-        buildMetadataUri = vm.envOr("BUILD_METADATA_URI", bytes(" "));
     }
 
     function run() public broadcast {
@@ -65,8 +58,6 @@ contract DeployTokenVoting_1_4Script is Script {
 
         // Done
         printDeployment();
-
-        printVersionPublishProposal();
 
         // Write the addresses to a JSON file
         if (!vm.envOr("SIMULATION", false)) {
@@ -90,35 +81,6 @@ contract DeployTokenVoting_1_4Script is Script {
         console2.log("- PluginSetup:               ", address(pluginSetup));
         console2.log("- GovernanceERC20:           ", address(governanceERC20));
         console2.log("- GovernanceWrappedERC20:    ", address(governanceWrappedERC20));
-        console2.log("");
-    }
-
-    function printVersionPublishProposal() public view {
-        // Pick the .env contract addresses from:
-        // https://github.com/aragon/osx/blob/main/packages/artifacts/src/addresses.json
-        // https://github.com/aragon/token-voting-plugin/blob/main/artifacts/
-        // https://github.com/aragon/token-voting-plugin-hardhat/blob/main/packages/artifacts/src/addresses.json
-
-        bytes memory data =
-            abi.encodeCall(IPluginRepo.createVersion, (1, address(pluginSetup), buildMetadataUri, releaseMetadataUri));
-
-        console2.log("Version proposal:");
-        console2.log("- Proposal created on:       ", address(mgmtDaoMultisig), " (Multisig)");
-        console2.log("- Action to:                 ", address(pluginRepo), " (TokenVoting repo)");
-        console2.log("");
-        console2.log("Action signature:");
-        console2.log("- createVersion(uint8 release, address pluginSetup, bytes buildMetadata, bytes releaseMetadata)");
-        console2.log("");
-        console2.log("Proposal commands:");
-        console2.log("");
-        console2.log("$ export FROM_ADDRESS=<your-address>");
-        console2.log("");
-        console2.log("$ export WALLET_TYPE=\"--trezor\"   (Set the appropriate value)");
-        console2.log("$ export WALLET_TYPE=\"--ledger\"");
-        console2.log("");
-        console2.log(
-            "$ cast send $WALLET_TYPE --from $FROM_ADDRESS", vm.toString(address(mgmtDaoMultisig)), vm.toString(data)
-        );
         console2.log("");
     }
 

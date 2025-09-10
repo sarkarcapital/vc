@@ -4,7 +4,8 @@ coverage
 out
 
 # Files
-*.env
+.env
+.env-*
 *.log
 .DS_Store
 lcov.info
@@ -20,3 +21,4 @@ broadcast/*
 broadcast/*/31337/
 
 artifacts
+script/metadata/upgrade-proposal-metadata.json
