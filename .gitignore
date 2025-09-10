@@ -4,7 +4,8 @@ coverage
 out
 
 # Files
-*.env
+.env
+.env-*
 *.log
 .DS_Store
 lcov.info
