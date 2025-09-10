@@ -280,7 +280,7 @@ script/metadata/upgrade-proposal-metadata.json: broadcast/$(DEPLOYMENT_SCRIPT).s
 	@PLUGIN_SETUP=$$(cat $(<) | jq ".transactions[2].contractAddress" | xargs echo) && \
 		cat script/metadata/upgrade-proposal-metadata-template.json \
 		| sed  "s/___PLUGIN_SETUP___/$$PLUGIN_SETUP/g" \
-		| sed  "s/___PLUGIN_REPO___/$(TOKEN_VOTING_PLUGIN_REPO_ADDRESS)/g" \
+		| sed  "s/___PLUGIN_REPO___/$(PLUGIN_REPO_ADDRESS)/g" \
 		| sed  "s/___RELEASE_METADATA___/$(subst /,\/,$(subst ',,$(subst ",,$(RELEASE_METADATA_URI))))/g" \
 		| sed  "s/___BUILD_METADATA___/$(subst /,\/,$(subst ',,$(subst ",,$(BUILD_METADATA_URI))))/g" \
 		> $(@)
