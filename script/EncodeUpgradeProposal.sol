@@ -77,12 +77,13 @@ contract DeployTokenVoting_1_4Script is Script {
         );
         console2.log("");
         console2.log("$ export FROM_ADDRESS=<your-address>");
+        console2.log("$ export RPC_URL='https://chain-name-here.drpc.org'");
         console2.log("");
         console2.log("$ export WALLET_TYPE=\"--trezor\"   (Set the appropriate value)");
         console2.log("$ export WALLET_TYPE=\"--ledger\"");
         console2.log("");
         console2.log(
-            "$ cast send $WALLET_TYPE --from $FROM_ADDRESS",
+            "$ cast send $WALLET_TYPE --from $FROM_ADDRESS --rpc-url $RPC_URL",
             vm.toString(address(mgmtDaoMultisig)),
             vm.toString(createProposalData)
         );
