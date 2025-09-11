@@ -286,7 +286,7 @@ pin-metadata: ## Uploads and pins the release/build metadata on IPFS
 
 .PHONY: script/metadata/upgrade-proposal-metadata.json
 script/metadata/upgrade-proposal-metadata.json: broadcast/$(DEPLOYMENT_SCRIPT).s.sol/$(CHAIN_ID)/run-latest.json
-	@PLUGIN_SETUP=$$(cat $(<) | jq ".transactions[2].contractAddress" | xargs echo) \
+	@PLUGIN_SETUP=$$(cat $(<) | jq ".transactions[2].contractAddress" | xargs echo) && \
 		cat script/metadata/upgrade-proposal-metadata-template.json \
 		| sed  "s/___PLUGIN_SETUP___/$$PLUGIN_SETUP/g" \
 		| sed  "s/___PLUGIN_REPO___/$(PLUGIN_REPO_ADDRESS)/g" \
