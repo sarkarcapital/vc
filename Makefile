@@ -286,7 +286,7 @@ pin-metadata: ## Uploads and pins the release/build metadata on IPFS
 
 .PHONY: script/metadata/upgrade-proposal-metadata.json
 script/metadata/upgrade-proposal-metadata.json: broadcast/$(DEPLOYMENT_SCRIPT).s.sol/$(CHAIN_ID)/run-latest.json
-	@PLUGIN_SETUP=$$(cat $(<) | jq ".transactions[2].contractAddress" | xargs echo) && \
+	@PLUGIN_SETUP=$$(cat $(<) | jq ".transactions[2].contractAddress" | xargs echo) \
 		cat script/metadata/upgrade-proposal-metadata-template.json \
 		| sed  "s/___PLUGIN_SETUP___/$$PLUGIN_SETUP/g" \
 		| sed  "s/___PLUGIN_REPO___/$(PLUGIN_REPO_ADDRESS)/g" \
@@ -346,6 +346,7 @@ resume: test ## Retry pending deployment transactions, verify the code and write
 upgrade-proposal: script/metadata/upgrade-proposal-metadata.json ## Encodes and shows the calldata to create the upgrade proposal
 	PLUGIN_SETUP=$$(cat broadcast/$(DEPLOYMENT_SCRIPT).s.sol/$(CHAIN_ID)/run-latest.json | jq ".transactions[2].contractAddress" | xargs echo) \
 		PROPOSAL_METADATA_URI=ipfs://$$(deno run --allow-read --allow-env --allow-net script/ipfs-pin.ts $(<)) \
+		TIMESTAMP=$$(deno eval "console.log(Math.floor(Date.now()/1000))") \
         forge script script/EncodeUpgradeProposal.sol
 
 ## Verification:

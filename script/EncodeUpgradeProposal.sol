@@ -55,7 +55,7 @@ contract DeployTokenVoting_1_4Script is Script {
         Action[] memory actions = new Action[](1);
         actions[0].to = address(pluginRepo);
         actions[0].data = actionData;
-        uint64 expirationDate = uint64(block.timestamp) + 3 weeks;
+        uint64 expirationDate = uint64(vm.envUint("TIMESTAMP")) + 3 weeks;
         bytes memory createProposalData = abi.encodeCall(
             IMultisigProposal.createProposal, (proposalMetadataUri, actions, 0, true, false, 0, expirationDate)
         );
