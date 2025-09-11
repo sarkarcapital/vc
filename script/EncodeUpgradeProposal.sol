@@ -38,8 +38,8 @@ contract DeployTokenVoting_1_4Script is Script {
         mgmtDaoMultisig = vm.envAddress("MANAGEMENT_DAO_MULTISIG_ADDRESS");
 
         proposalMetadataUri = bytes(vm.envString("PROPOSAL_METADATA_URI"));
-        releaseMetadataUri = vm.envOr("RELEASE_METADATA_URI", bytes(" "));
-        buildMetadataUri = vm.envOr("BUILD_METADATA_URI", bytes(" "));
+        releaseMetadataUri = bytes(vm.envString("RELEASE_METADATA_URI"));
+        buildMetadataUri = bytes(vm.envString("BUILD_METADATA_URI"));
     }
 
     function run() public view {
