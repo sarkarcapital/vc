@@ -7,12 +7,12 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {IDAO} from "@aragon/osx/core/dao/DAO.sol";
 import {Action} from "@aragon/osx-commons-contracts/src/executors/Executor.sol";
 import {TokenVotingSetup} from "../src/TokenVotingSetup.sol";
+import {TokenVotingSetupZkSync} from "../src/TokenVotingSetupZkSync.sol";
 import {GovernanceERC20} from "../src/erc20/GovernanceERC20.sol";
 import {GovernanceWrappedERC20} from "../src/erc20/GovernanceWrappedERC20.sol";
 import {PluginRepo} from "@aragon/osx/framework/plugin/repo/PluginRepo.sol";
 import {IPluginRepo} from "@aragon/osx/framework/plugin/repo/IPluginRepo.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-// import {hashHelpers, PluginSetupRef} from "@aragon/osx/framework/plugin/setup/PluginSetupProcessorHelpers.sol";
 
 /**
  * This script performs the following tasks:
@@ -26,7 +26,7 @@ contract DeployTokenVoting_1_4Script is Script {
     PluginRepo pluginRepo;
 
     // Artifacts
-    TokenVotingSetup pluginSetup;
+    address pluginSetup;
     GovernanceERC20 governanceERC20;
     GovernanceWrappedERC20 governanceWrappedERC20;
 
@@ -72,8 +72,12 @@ contract DeployTokenVoting_1_4Script is Script {
         );
         governanceWrappedERC20 = new GovernanceWrappedERC20(IERC20Upgradeable(address(0)), "", "");
 
-        // Plugin setup
-        pluginSetup = new TokenVotingSetup(governanceERC20, governanceWrappedERC20);
+        // Plugin setup (the installer)
+        if (block.chainid != 300 && block.chainid != 324) {
+            pluginSetup = address(new TokenVotingSetup(governanceERC20, governanceWrappedERC20));
+        } else {
+            pluginSetup = address(new TokenVotingSetupZkSync());
+        }
     }
 
     function printDeployment() public view {
