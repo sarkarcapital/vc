@@ -5,6 +5,8 @@ on:
 
 jobs:
   publish-artifacts-to-npm:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
 
     steps:
