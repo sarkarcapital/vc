@@ -45,8 +45,7 @@ contract DeployTokenVoting_1_4Script is Script {
     function run() public view {
         // Pick the .env contract addresses from:
         // https://github.com/aragon/osx/blob/main/packages/artifacts/src/addresses.json
-        // https://github.com/aragon/token-voting-plugin/blob/main/artifacts/
-        // https://github.com/aragon/token-voting-plugin-hardhat/blob/main/packages/artifacts/src/addresses.json
+        // https://github.com/aragon/token-voting-plugin/blob/main/npm-artifacts/src/addresses.json
 
         bytes memory actionData = abi.encodeCall(
             IPluginRepo.createVersion, (RELEASE, address(pluginSetup), buildMetadataUri, releaseMetadataUri)

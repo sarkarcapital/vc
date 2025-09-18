@@ -13,7 +13,7 @@ DEPLOYMENT_SCRIPT := DeployTokenVoting_1_4
 # DEPLOYMENT_SCRIPT := DeployNewTokenVotingRepo
 
 SOLC_VERSION := $(shell cat foundry.toml | grep solc | cut -d= -f2 | xargs echo || echo "0.8.28")
-SUPPORTED_VERIFIERS := etherscan blockscout sourcify routescan-mainnet routescan-testnet
+SUPPORTED_VERIFIERS := etherscan blockscout sourcify zksync routescan-mainnet routescan-testnet
 MAKE_TEST_TREE_CMD := deno run ./script/make-test-tree.ts
 VERIFY_CONTRACTS_SCRIPT := script/verify-contracts.sh
 TEST_TREE_MARKDOWN := TESTS.md
@@ -43,44 +43,43 @@ endif
 # Conditional assignments
 
 ifeq ($(VERIFIER), etherscan)
-	VERIFIER_URL := https://api.etherscan.io/api
-	VERIFIER_API_KEY := $(ETHERSCAN_API_KEY)
-	VERIFIER_PARAMS := --verifier $(VERIFIER) --etherscan-api-key $(ETHERSCAN_API_KEY)
-endif
+  VERIFIER_URL := https://api.etherscan.io/api
+  VERIFIER_API_KEY := $(ETHERSCAN_API_KEY)
+  VERIFIER_PARAMS := --verifier $(VERIFIER) --etherscan-api-key $(ETHERSCAN_API_KEY)
+else ifeq ($(VERIFIER), blockscout)
+  VERIFIER_URL := https://$(BLOCKSCOUT_HOST_NAME)/api\?
+  VERIFIER_API_KEY := ""
+  VERIFIER_PARAMS = --verifier $(VERIFIER) --verifier-url "$(VERIFIER_URL)"
+else ifeq ($(VERIFIER), sourcify)
+else ifeq ($(VERIFIER), zksync)
+  ifeq ($(CHAIN_ID),300)
+    VERIFIER_URL := https://explorer.sepolia.era.zksync.dev/contract_verification
+  else ifeq ($(CHAIN_ID),324)
+      VERIFIER_URL := https://zksync2-mainnet-explorer.zksync.io/contract_verification
+  endif
+  VERIFIER_API_KEY := ""
+  VERIFIER_PARAMS = --verifier $(VERIFIER) --verifier-url "$(VERIFIER_URL)"
+else ifneq ($(filter $(VERIFIER), routescan-mainnet routescan-testnet),)
+  ifeq ($(VERIFIER), routescan-mainnet)
+    VERIFIER_URL := https://api.routescan.io/v2/network/mainnet/evm/$(CHAIN_ID)/etherscan
+  else
+    VERIFIER_URL := https://api.routescan.io/v2/network/testnet/evm/$(CHAIN_ID)/etherscan
+  endif
 
-ifeq ($(VERIFIER), blockscout)
-	VERIFIER_URL := https://$(BLOCKSCOUT_HOST_NAME)/api\?
-	VERIFIER_API_KEY := ""
-	VERIFIER_PARAMS = --verifier $(VERIFIER) --verifier-url "$(VERIFIER_URL)"
-endif
-
-# ifeq ($(VERIFIER), sourcify)
-# endif
-
-ifneq ($(filter $(VERIFIER), routescan-mainnet routescan-testnet),)
-	ifeq ($(VERIFIER), routescan-mainnet)
-		VERIFIER_URL := https://api.routescan.io/v2/network/mainnet/evm/$(CHAIN_ID)/etherscan
-	else
-		VERIFIER_URL := https://api.routescan.io/v2/network/testnet/evm/$(CHAIN_ID)/etherscan
-	endif
-
-	VERIFIER := custom
-	VERIFIER_API_KEY := "verifyContract"
-	VERIFIER_PARAMS = --verifier $(VERIFIER) --verifier-url '$(VERIFIER_URL)' --etherscan-api-key $(VERIFIER_API_KEY)
-endif
-
-# When invoked like `make deploy slow=true`
-ifeq ($(slow),true)
-	SLOW_FLAG := --slow
+  VERIFIER := custom
+  VERIFIER_API_KEY := "verifyContract"
+  VERIFIER_PARAMS = --verifier $(VERIFIER) --verifier-url '$(VERIFIER_URL)' --etherscan-api-key $(VERIFIER_API_KEY)
 endif
 
 # Additional chain-dependent params (Foundry)
-ifeq ($(CHAIN_ID),300)
-    FORGE_BUILD_CUSTOM_PARAMS := --zksync
+ifeq ($(CHAIN_ID),88888)
+  FORGE_SCRIPT_CUSTOM_PARAMS := --priority-gas-price 1000000000 --gas-price 5200000000000
+else ifeq ($(CHAIN_ID),300)
+  FORGE_SCRIPT_CUSTOM_PARAMS := --slow
+  FORGE_BUILD_CUSTOM_PARAMS := --zksync
 else ifeq ($(CHAIN_ID),324)
-    FORGE_BUILD_CUSTOM_PARAMS := --zksync
-else ifeq ($(CHAIN_ID),88888)
-    FORGE_SCRIPT_CUSTOM_PARAMS := --priority-gas-price 1000000000 --gas-price 5200000000000
+  FORGE_SCRIPT_CUSTOM_PARAMS := --slow
+  FORGE_BUILD_CUSTOM_PARAMS := --zksync
 endif
 
 # TARGETS
@@ -318,7 +317,6 @@ deploy: test ## Deploy the protocol, verify the source code and write to ./artif
 		--broadcast \
 		--verify \
 		$(VERIFIER_PARAMS) \
-		$(SLOW_FLAG) \
 		$(FORGE_BUILD_CUSTOM_PARAMS) \
 		$(FORGE_SCRIPT_CUSTOM_PARAMS) \
 		$(VERBOSITY) 2>&1 | tee -a $(LOGS_FOLDER)/$(DEPLOYMENT_LOG_FILE)
@@ -335,7 +333,6 @@ resume: test ## Retry pending deployment transactions, verify the code and write
 		--verify \
 		--resume \
 		$(VERIFIER_PARAMS) \
-		$(SLOW_FLAG) \
 		$(FORGE_BUILD_CUSTOM_PARAMS) \
 		$(FORGE_SCRIPT_CUSTOM_PARAMS) \
 		$(VERBOSITY) 2>&1 | tee -a $(LOGS_FOLDER)/$(DEPLOYMENT_LOG_FILE)
