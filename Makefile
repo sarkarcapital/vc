@@ -341,6 +341,10 @@ resume: test ## Retry pending deployment transactions, verify the code and write
 
 .PHONY: upgrade-proposal
 upgrade-proposal: script/metadata/upgrade-proposal-metadata.json ## Encodes and shows the calldata to create the upgrade proposal
+	@if [ "$(CHAIN_ID)" == "300" -o "$(CHAIN_ID)" == "324" ]; then \
+		echo "On ZkSync, you need to manually define the PluginSetup adress passed to EncodeUpgradeProposal.sol" ; \
+		exit 1; \
+	fi
 	PLUGIN_SETUP=$$(cat broadcast/$(DEPLOYMENT_SCRIPT).s.sol/$(CHAIN_ID)/run-latest.json | jq ".transactions[2].contractAddress" | xargs echo) \
 		PROPOSAL_METADATA_URI=ipfs://$$(deno run --allow-read --allow-env --allow-net script/ipfs-pin.ts $(<)) \
 		TIMESTAMP=$$(deno eval "console.log(Math.floor(Date.now()/1000))") \
