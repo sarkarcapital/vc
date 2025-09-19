@@ -76,6 +76,7 @@ contract DeployTokenVoting_1_4Script is Script {
         if (block.chainid != 300 && block.chainid != 324) {
             pluginSetup = address(new TokenVotingSetup(governanceERC20, governanceWrappedERC20));
         } else {
+            console2.log("Using TokenVotingSetupZkSync\n");
             pluginSetup = address(new TokenVotingSetupZkSync());
         }
     }
