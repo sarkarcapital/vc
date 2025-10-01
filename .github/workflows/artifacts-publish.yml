@@ -3,6 +3,9 @@ name: Publish Artifacts
 on:
   workflow_dispatch:
 
+env:
+  FOUNDRY_PROFILE: ci
+
 jobs:
   publish-artifacts-to-npm:
     permissions:
