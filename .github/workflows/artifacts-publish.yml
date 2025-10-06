@@ -13,6 +13,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Load secrets from OP
+        id: load-secrets
+        uses: 1password/load-secrets-action@v3.0.0
+        with:
+          export-env: false
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          NPM_TOKEN: op://kv_token-voting-plugin_infra/NPM_TOKEN/credential
+
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -34,7 +43,7 @@ jobs:
           cd npm-artifacts
           SCOPE=$(jq -r '.name' package.json | cut -d'/' -f1)
           echo "$SCOPE:registry=https://registry.npmjs.org/" > ~/.npmrc
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+          echo "//registry.npmjs.org/:_authToken=${{ steps.load-secrets.outputs.NPM_TOKEN }}" >> ~/.npmrc
 
       - name: Get Version from package.json
         id: get_version
@@ -63,7 +72,7 @@ jobs:
 
       - name: Publish to NPM
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ steps.load-secrets.outputs.NPM_TOKEN }}
         run: |
           cd npm-artifacts
           if [[ "$VERSION" == *"-alpha"* ]]; then
