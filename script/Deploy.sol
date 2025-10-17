@@ -96,9 +96,8 @@ contract DeployTokenVoting_1_4Script is Script {
         artifacts.serialize("governanceERC20", address(governanceERC20));
         artifacts = artifacts.serialize("governanceWrappedERC20", address(governanceWrappedERC20));
 
-        string memory networkName = vm.envString("NETWORK_NAME");
         string memory filePath = string.concat(
-            vm.projectRoot(), "/artifacts/deployment-", networkName, "-", vm.toString(block.timestamp), ".json"
+            vm.projectRoot(), "/artifacts/deployment-", vm.toString(block.timestamp), ".json"
         );
         artifacts.write(filePath);
 

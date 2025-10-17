@@ -4,6 +4,7 @@ coverage
 out
 zkout
 
+broadcast 
 # Files
 .env
 .env-*
