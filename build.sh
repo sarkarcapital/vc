@@ -10,4 +10,7 @@ export PLUGIN_REPO_ADDRESS="0xcf59C627b7a4052041C4F16B4c635a960e29554A"
 export PLUGIN_SETUP_PROCESSOR_ADDRESS="0xE978942c691e43f65c1B7c7F8f1dc8cDF061B13f"
 
 mkdir artifacts
-forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 --broadcast -vvvv
+forge script script/Deploy.sol --rpc-url http://127.0.0.1:8545 --broadcast -vvvv
+cd npm-artifacts
+chmod+x prepare-abi.sh
+./prepare-abi.sh
